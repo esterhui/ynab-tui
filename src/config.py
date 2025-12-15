@@ -87,7 +87,7 @@ class Config:
     categorization: CategorizationConfig = field(default_factory=CategorizationConfig)
     payees: PayeesConfig = field(default_factory=PayeesConfig)
     display: DisplayConfig = field(default_factory=DisplayConfig)
-    data_dir: Path = field(default_factory=lambda: Path.home() / ".config" / "ynab-cli")
+    data_dir: Path = field(default_factory=lambda: Path.home() / ".config" / "ynab-tui")
 
     def __post_init__(self):
         """Ensure data directory exists."""
@@ -131,7 +131,7 @@ def load_config(config_path: Optional[Path] = None) -> Config:
 
     Args:
         config_path: Path to config.toml file. If None, looks for config.toml
-                     in ~/.config/ynab-cli/config.toml or current directory.
+                     in ~/.config/ynab-tui/config.toml or current directory.
 
     Returns:
         Config object with all settings.
@@ -149,7 +149,7 @@ def load_config(config_path: Optional[Path] = None) -> Config:
     # Search for config file
     if config_path is None:
         search_paths = [
-            Path.home() / ".config" / "ynab-cli" / "config.toml",
+            Path.home() / ".config" / "ynab-tui" / "config.toml",
             Path.cwd() / "config.toml",
         ]
         for path in search_paths:

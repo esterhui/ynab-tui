@@ -30,8 +30,8 @@ uv sync --all-extras
 Copy the example config and fill in your credentials:
 
 ```bash
-mkdir -p ~/.config/ynab-cli
-cp config.example.toml ~/.config/ynab-cli/config.toml
+mkdir -p ~/.config/ynab-tui
+cp config.example.toml ~/.config/ynab-tui/config.toml
 ```
 
 Required credentials:

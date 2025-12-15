@@ -1,6 +1,6 @@
 # YNAB TUI Configuration
-# Copy this file to ~/.config/ynab-cli/config.toml and fill in your credentials
-# Or specify a custom location with: ynab-cli --config /path/to/config.toml
+# Copy this file to ~/.config/ynab-tui/config.toml and fill in your credentials
+# Or specify a custom location with: ynab-tui --config /path/to/config.toml
 # Credentials can also be set via environment variables (see comments)
 
 [ynab]

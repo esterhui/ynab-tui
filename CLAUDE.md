@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**IMPORTANT:** DB location is `~/.config/ynab-cli/categorizer.db` (PROD) and `~/.config/ynab-cli/mock_categorizer.db` (mock)
+**IMPORTANT:** DB location is `~/.config/ynab-tui/categorizer.db` (PROD) and `~/.config/ynab-tui/mock_categorizer.db` (mock)
 
 **IMPORTANT:** Never clear the production database unless you ask the user and get permission
 
@@ -109,7 +109,7 @@ YNAB API ──pull──→ Local SQLite DB ←──pull── Amazon Orders
 
 ### Configuration
 
-Config from `~/.config/ynab-cli/config.toml` with env var overrides:
+Config from `~/.config/ynab-tui/config.toml` with env var overrides:
 
 | Setting | Env Variable | Default |
 |---------|--------------|---------|
