@@ -4,8 +4,13 @@ from datetime import datetime
 
 import pytest
 
+from src.db.database import AmazonOrderCache
 from src.models import Transaction
-from src.services.category_mapping import LearningResult
+from src.services.category_mapping import (
+    ItemCategoryPrediction,
+    LearningResult,
+    OrderCategoryPrediction,
+)
 from src.utils import is_amazon_payee
 
 
@@ -425,3 +430,206 @@ class TestCategoryMappingServiceWithMockData:
         for mapping in mappings:
             assert len(mapping["categories"]) == 1
             assert mapping["categories"][0]["name"] == "Reimburse"
+
+
+class TestOrderCategoryPrediction:
+    """Tests for OrderCategoryPrediction dataclass."""
+
+    def test_has_any_predictions_true(self):
+        """Test has_any_predictions when items have predictions."""
+        prediction = OrderCategoryPrediction(
+            order_id="order-123",
+            item_predictions=[
+                ItemCategoryPrediction(
+                    item_name="Item 1",
+                    category_id="cat-001",
+                    category_name="Electronics",
+                    confidence=0.8,
+                    occurrence_count=5,
+                ),
+            ],
+        )
+        assert prediction.has_any_predictions is True
+
+    def test_has_any_predictions_false(self):
+        """Test has_any_predictions when no items have predictions."""
+        prediction = OrderCategoryPrediction(
+            order_id="order-123",
+            item_predictions=[
+                ItemCategoryPrediction(
+                    item_name="Unknown Item",
+                    category_id=None,
+                    category_name=None,
+                    confidence=0.0,
+                    occurrence_count=0,
+                ),
+            ],
+        )
+        assert prediction.has_any_predictions is False
+
+    def test_dominant_category_single_item(self):
+        """Test dominant_category with single item."""
+        prediction = OrderCategoryPrediction(
+            order_id="order-123",
+            item_predictions=[
+                ItemCategoryPrediction(
+                    item_name="Item 1",
+                    category_id="cat-001",
+                    category_name="Electronics",
+                    confidence=0.9,
+                    occurrence_count=10,
+                ),
+            ],
+        )
+        result = prediction.dominant_category
+        assert result is not None
+        assert result[0] == "cat-001"
+        assert result[1] == "Electronics"
+        assert result[2] == 0.9
+
+    def test_dominant_category_multiple_items_same_category(self):
+        """Test dominant_category when items share the same category."""
+        prediction = OrderCategoryPrediction(
+            order_id="order-123",
+            item_predictions=[
+                ItemCategoryPrediction(
+                    item_name="Item 1",
+                    category_id="cat-001",
+                    category_name="Electronics",
+                    confidence=0.8,
+                    occurrence_count=5,
+                ),
+                ItemCategoryPrediction(
+                    item_name="Item 2",
+                    category_id="cat-001",
+                    category_name="Electronics",
+                    confidence=0.9,
+                    occurrence_count=10,
+                ),
+            ],
+        )
+        result = prediction.dominant_category
+        assert result is not None
+        assert result[0] == "cat-001"
+        assert result[1] == "Electronics"
+        # Average confidence: (0.8 + 0.9) / 2 = 0.85
+        assert abs(result[2] - 0.85) < 0.01
+
+    def test_dominant_category_different_categories(self):
+        """Test dominant_category returns most common category."""
+        prediction = OrderCategoryPrediction(
+            order_id="order-123",
+            item_predictions=[
+                ItemCategoryPrediction(
+                    item_name="Item 1",
+                    category_id="cat-001",
+                    category_name="Electronics",
+                    confidence=0.8,
+                    occurrence_count=5,
+                ),
+                ItemCategoryPrediction(
+                    item_name="Item 2",
+                    category_id="cat-002",
+                    category_name="Home",
+                    confidence=0.7,
+                    occurrence_count=3,
+                ),
+                ItemCategoryPrediction(
+                    item_name="Item 3",
+                    category_id="cat-001",
+                    category_name="Electronics",
+                    confidence=0.9,
+                    occurrence_count=8,
+                ),
+            ],
+        )
+        result = prediction.dominant_category
+        assert result is not None
+        # cat-001 appears twice, cat-002 once
+        assert result[0] == "cat-001"
+        assert result[1] == "Electronics"
+
+    def test_dominant_category_none_when_no_predictions(self):
+        """Test dominant_category returns None when no items have categories."""
+        prediction = OrderCategoryPrediction(
+            order_id="order-123",
+            item_predictions=[
+                ItemCategoryPrediction(
+                    item_name="Unknown Item",
+                    category_id=None,
+                    category_name=None,
+                    confidence=0.0,
+                    occurrence_count=0,
+                ),
+            ],
+        )
+        assert prediction.dominant_category is None
+
+
+class TestPredictItemCategory:
+    """Tests for predict_item_category method."""
+
+    def test_predict_item_category_with_history(self, category_mapping_service, database):
+        """Test predicting category for item with history."""
+        # Add history for an item
+        for i in range(5):
+            database.record_item_category_learning(
+                item_name="USB Cable",
+                category_id="cat-electronics",
+                category_name="Electronics",
+                source_transaction_id=f"txn-{i}",
+            )
+
+        prediction = category_mapping_service.predict_item_category("USB Cable")
+
+        assert prediction.item_name == "USB Cable"
+        assert prediction.category_id == "cat-electronics"
+        assert prediction.category_name == "Electronics"
+        assert prediction.confidence == 1.0
+        assert prediction.occurrence_count == 5
+
+    def test_predict_item_category_no_history(self, category_mapping_service):
+        """Test predicting category for item with no history."""
+        prediction = category_mapping_service.predict_item_category("Unknown Item XYZ")
+
+        assert prediction.item_name == "Unknown Item XYZ"
+        assert prediction.category_id is None
+        assert prediction.category_name is None
+        assert prediction.confidence == 0.0
+        assert prediction.occurrence_count == 0
+
+
+class TestPredictOrderCategories:
+    """Tests for predict_order_categories method."""
+
+    def test_predict_order_categories(self, category_mapping_service, database):
+        """Test predicting categories for all items in an order."""
+        # Add history for some items
+        database.record_item_category_learning(
+            item_name="USB Cable",
+            category_id="cat-electronics",
+            category_name="Electronics",
+            source_transaction_id="txn-1",
+        )
+
+        # Create an order
+        order = AmazonOrderCache(
+            order_id="order-test",
+            order_date=datetime(2024, 1, 15),
+            total=50.00,
+            items=["USB Cable", "Unknown Item"],
+            fetched_at=datetime(2024, 1, 15),
+        )
+
+        prediction = category_mapping_service.predict_order_categories(order)
+
+        assert prediction.order_id == "order-test"
+        assert len(prediction.item_predictions) == 2
+
+        # First item should have prediction
+        usb_pred = next(p for p in prediction.item_predictions if p.item_name == "USB Cable")
+        assert usb_pred.category_id == "cat-electronics"
+
+        # Second item should not have prediction
+        unknown_pred = next(p for p in prediction.item_predictions if p.item_name == "Unknown Item")
+        assert unknown_pred.category_id is None

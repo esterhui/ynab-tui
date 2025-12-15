@@ -99,14 +99,6 @@ class YNABClientProtocol(Protocol):
         """Test API connection."""
         ...
 
-    def get_payee_transactions(
-        self,
-        payee_name: str,
-        limit: int = 100,
-    ) -> list[Transaction]:
-        """Get transactions for a specific payee."""
-        ...
-
 
 class AmazonClientProtocol(Protocol):
     """Protocol defining the Amazon client interface."""

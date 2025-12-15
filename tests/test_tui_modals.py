@@ -414,3 +414,223 @@ class TestTransactionSearchModal:
             # Press Enter
             await pilot.press("enter")
             await pilot.pause()
+
+
+class TestBudgetPickerModal:
+    """Tests for BudgetPickerModal."""
+
+    @pytest.fixture
+    def sample_budgets(self):
+        """Sample budgets for testing."""
+        from datetime import datetime
+
+        return [
+            {
+                "id": "budget-1",
+                "name": "Personal Budget",
+                "last_modified_on": datetime(2024, 1, 15),
+            },
+            {
+                "id": "budget-2",
+                "name": "Business Budget",
+                "last_modified_on": "2024-02-20",
+            },
+            {
+                "id": "budget-3",
+                "name": "Savings Budget",
+                "last_modified_on": None,
+            },
+        ]
+
+    async def test_modal_opens_without_crash(self, sample_budgets):
+        """Test modal opens successfully."""
+        from src.tui.modals.budget_picker import BudgetPickerModal
+
+        modal = BudgetPickerModal(budgets=sample_budgets)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_modal_with_current_budget(self, sample_budgets):
+        """Test modal with current budget highlighted."""
+        from src.tui.modals.budget_picker import BudgetPickerModal
+
+        modal = BudgetPickerModal(
+            budgets=sample_budgets,
+            current_budget_id="budget-1",
+        )
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_modal_enter_selects(self, sample_budgets):
+        """Test Enter key selects budget."""
+        from src.tui.modals.budget_picker import BudgetPickerModal
+
+        modal = BudgetPickerModal(budgets=sample_budgets)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+
+    async def test_modal_typing_filter(self, sample_budgets):
+        """Test typing to filter budgets."""
+        from src.tui.modals.budget_picker import BudgetPickerModal
+
+        modal = BudgetPickerModal(budgets=sample_budgets)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("p")
+            await pilot.pause()
+            await pilot.press("e")
+            await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
+
+
+class TestBudgetSelection:
+    """Tests for BudgetSelection dataclass."""
+
+    def test_budget_selection_creation(self):
+        """Test creating a BudgetSelection."""
+        from src.tui.modals.budget_picker import BudgetSelection
+
+        selection = BudgetSelection(budget_id="budget-1", budget_name="My Budget")
+        assert selection.budget_id == "budget-1"
+        assert selection.budget_name == "My Budget"
+
+
+class TestCategoryFilterModal:
+    """Tests for CategoryFilterModal."""
+
+    async def test_modal_opens_without_crash(self, sample_categories):
+        """Test modal opens successfully."""
+        from src.tui.modals.category_filter import CategoryFilterModal
+
+        modal = CategoryFilterModal(categories=sample_categories)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_modal_enter_selects(self, sample_categories):
+        """Test Enter key selects category."""
+        from src.tui.modals.category_filter import CategoryFilterModal
+
+        modal = CategoryFilterModal(categories=sample_categories)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+
+    async def test_modal_typing_filter(self, sample_categories):
+        """Test typing to filter categories."""
+        from src.tui.modals.category_filter import CategoryFilterModal
+
+        modal = CategoryFilterModal(categories=sample_categories)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("g")
+            await pilot.pause()
+            await pilot.press("r")
+            await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
+
+
+class TestCategoryFilterResult:
+    """Tests for CategoryFilterResult dataclass."""
+
+    def test_category_filter_result_creation(self):
+        """Test creating a CategoryFilterResult."""
+        from src.tui.modals.category_filter import CategoryFilterResult
+
+        result = CategoryFilterResult(category_id="cat-1", category_name="Groceries")
+        assert result.category_id == "cat-1"
+        assert result.category_name == "Groceries"
+
+
+class TestPayeeFilterModal:
+    """Tests for PayeeFilterModal."""
+
+    @pytest.fixture
+    def sample_payees(self):
+        """Sample payees for testing."""
+        return ["Amazon", "Walmart", "Target", "Costco"]
+
+    async def test_modal_opens_without_crash(self, sample_payees):
+        """Test modal opens successfully."""
+        from src.tui.modals.payee_filter import PayeeFilterModal
+
+        modal = PayeeFilterModal(payees=sample_payees)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_modal_enter_selects(self, sample_payees):
+        """Test Enter key selects payee."""
+        from src.tui.modals.payee_filter import PayeeFilterModal
+
+        modal = PayeeFilterModal(payees=sample_payees)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+
+    async def test_modal_navigation(self, sample_payees):
+        """Test navigation in payee filter."""
+        from src.tui.modals.payee_filter import PayeeFilterModal
+
+        modal = PayeeFilterModal(payees=sample_payees)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("down")
+            await pilot.pause()
+            await pilot.press("up")
+            await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
+
+
+class TestGetUniquePayees:
+    """Tests for get_unique_payees function."""
+
+    def test_get_unique_payees(self, sample_transactions):
+        """Test extracting unique payees from transactions."""
+        from src.tui.modals.payee_filter import get_unique_payees
+
+        payees = get_unique_payees(sample_transactions)
+        assert len(payees) == 3
+        assert "Grocery Store" in payees
+        assert "Gas Station" in payees
+        assert "Amazon" in payees
+
+    def test_get_unique_payees_empty(self):
+        """Test extracting payees from empty list."""
+        from src.tui.modals.payee_filter import get_unique_payees
+
+        payees = get_unique_payees([])
+        assert len(payees) == 0

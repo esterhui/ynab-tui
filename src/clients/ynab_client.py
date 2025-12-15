@@ -575,41 +575,6 @@ class YNABClient:
                 "error": str(e),
             }
 
-    @_ynab_api_call("fetch payee transactions")
-    def get_payee_transactions(
-        self,
-        payee_name: str,
-        limit: int = 100,
-    ) -> list[Transaction]:
-        """Get historical transactions for a payee.
-
-        Note: YNAB doesn't support filtering by payee name directly,
-        so we fetch recent transactions and filter client-side.
-
-        Args:
-            payee_name: Payee name to search for.
-            limit: Maximum transactions to return.
-
-        Returns:
-            List of transactions from this payee.
-        """
-        budget_id = self._get_budget_id()
-
-        with self._get_api_client() as api_client:
-            transactions_api = ynab.TransactionsApi(api_client)
-            response = transactions_api.get_transactions(budget_id)
-
-            # Filter by payee name (case-insensitive)
-            payee_lower = payee_name.lower()
-            matching = [
-                self._convert_transaction(t)
-                for t in response.data.transactions
-                if t.payee_name and payee_lower in t.payee_name.lower()
-            ]
-
-            matching.sort(key=lambda t: t.date, reverse=True)
-            return matching[:limit]
-
     def _convert_transactions(self, transactions) -> list[Transaction]:
         """Convert YNAB SDK transactions to our model."""
         return [self._convert_transaction(t) for t in transactions]

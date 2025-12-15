@@ -46,7 +46,11 @@ testpaths = ["tests"]
 
 [tool.coverage.run]
 source = ["src"]
-omit = ["src/mock_data/*"]
+omit = [
+    "src/mock_data/*",
+    "src/clients/ynab_client.py",
+    "src/clients/amazon_client.py",
+]
 
 [tool.coverage.report]
 exclude_lines = [

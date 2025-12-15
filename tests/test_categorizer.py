@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 
-from src.models import Transaction
+from src.models import CategoryList, Transaction
 from src.services.categorizer import CategorizerService
 
 
@@ -542,3 +542,321 @@ class TestApplySplitCategories:
 
         assert result.category_name == "[Split 3]"
         assert result.is_split is True
+
+
+class TestFormatPayeeHistorySummary:
+    """Tests for _format_payee_history_summary static method."""
+
+    def test_format_single_category(self):
+        """Test formatting with a single category."""
+        history = {
+            "Groceries": {"count": 10, "percentage": 1.0},
+        }
+        result = CategorizerService._format_payee_history_summary(history)
+        assert result == "100% Groceries"
+
+    def test_format_two_categories(self):
+        """Test formatting with two categories shows both."""
+        history = {
+            "Groceries": {"count": 8, "percentage": 0.8},
+            "Home": {"count": 2, "percentage": 0.2},
+        }
+        result = CategorizerService._format_payee_history_summary(history)
+        assert "80% Groceries" in result
+        assert "20% Home" in result
+
+    def test_format_three_categories_shows_top_two(self):
+        """Test that only top 2 categories are shown."""
+        history = {
+            "Groceries": {"count": 5, "percentage": 0.5},
+            "Home": {"count": 3, "percentage": 0.3},
+            "Electronics": {"count": 2, "percentage": 0.2},
+        }
+        result = CategorizerService._format_payee_history_summary(history)
+        assert "50% Groceries" in result
+        assert "30% Home" in result
+        assert "Electronics" not in result
+
+
+class TestRefreshCategories:
+    """Tests for refresh_categories method."""
+
+    def test_refresh_categories_reloads_from_db(self, categorizer_service, database):
+        """Test that refresh_categories reloads from database."""
+        # Add some categories to the database using upsert_category
+        database.upsert_category(
+            category_id="cat-new-001",
+            name="New Category",
+            group_id="group-001",
+            group_name="Test Group",
+        )
+
+        # Refresh and check
+        result = categorizer_service.refresh_categories()
+        assert isinstance(result, CategoryList)
+
+    def test_refresh_clears_cache(self, categorizer_service, database):
+        """Test that refresh clears the cached categories."""
+        # Access categories to populate cache
+        _ = categorizer_service.categories
+
+        # Add more categories
+        database.upsert_category(
+            category_id="cat-refresh-001",
+            name="Refresh Test",
+            group_id="group-001",
+            group_name="Test Group",
+        )
+
+        # Refresh should get new data
+        result = categorizer_service.refresh_categories()
+        all_cats = [cat for group in result.groups for cat in group.categories]
+        assert any(c.id == "cat-refresh-001" for c in all_cats)
+
+
+class TestGetTransactionsFilters:
+    """Tests for get_transactions with filters."""
+
+    @pytest.fixture
+    def transactions_for_filtering(self, database):
+        """Create transactions with various categories and payees."""
+        transactions = [
+            Transaction(
+                id="txn-filter-001",
+                date=datetime(2024, 1, 15),
+                amount=-50.00,
+                payee_name="COSTCO",
+                category_id="cat-groceries",
+                category_name="Groceries",
+                approved=True,
+            ),
+            Transaction(
+                id="txn-filter-002",
+                date=datetime(2024, 1, 16),
+                amount=-100.00,
+                payee_name="AMAZON.COM",
+                category_id="cat-electronics",
+                category_name="Electronics",
+                approved=True,
+            ),
+            Transaction(
+                id="txn-filter-003",
+                date=datetime(2024, 1, 17),
+                amount=-25.00,
+                payee_name="COSTCO",
+                category_id="cat-groceries",
+                category_name="Groceries",
+                approved=False,
+            ),
+        ]
+        for txn in transactions:
+            database.upsert_ynab_transaction(txn)
+        return transactions
+
+    def test_filter_by_category_id(self, categorizer_service, transactions_for_filtering):
+        """Test filtering transactions by category ID."""
+        batch = categorizer_service.get_transactions(category_id="cat-groceries")
+        ids = [t.id for t in batch.transactions]
+        assert "txn-filter-001" in ids
+        assert "txn-filter-003" in ids
+        assert "txn-filter-002" not in ids
+
+    def test_filter_by_payee_name(self, categorizer_service, transactions_for_filtering):
+        """Test filtering transactions by payee name."""
+        batch = categorizer_service.get_transactions(payee_name="COSTCO")
+        ids = [t.id for t in batch.transactions]
+        assert "txn-filter-001" in ids
+        assert "txn-filter-003" in ids
+        assert "txn-filter-002" not in ids
+
+
+class TestUndoCategory:
+    """Tests for undo_category method."""
+
+    @pytest.fixture
+    def categorized_transaction(self, categorizer_service, database):
+        """Create a transaction with a pending category change."""
+        txn = Transaction(
+            id="txn-undo-001",
+            date=datetime(2024, 1, 15),
+            amount=-50.00,
+            payee_name="TEST STORE",
+            category_id=None,
+            category_name=None,
+            approved=False,
+            sync_status="synced",
+        )
+        database.upsert_ynab_transaction(txn)
+        categorizer_service.apply_category(txn, "cat-001", "Electronics")
+        return txn
+
+    def test_undo_restores_original_category(self, categorizer_service, categorized_transaction):
+        """Test that undo restores the original category."""
+        result = categorizer_service.undo_category(categorized_transaction)
+        assert result.category_id is None
+        assert result.category_name is None
+        assert result.sync_status == "synced"
+
+    def test_undo_clears_pending_change(
+        self, categorizer_service, categorized_transaction, database
+    ):
+        """Test that undo removes the pending change from database."""
+        categorizer_service.undo_category(categorized_transaction)
+        pending = database.get_pending_change(categorized_transaction.id)
+        assert pending is None
+
+    def test_undo_raises_if_no_pending_change(self, categorizer_service, database):
+        """Test that undo raises error if no pending change exists."""
+        txn = Transaction(
+            id="txn-no-pending",
+            date=datetime(2024, 1, 15),
+            amount=-50.00,
+            payee_name="TEST STORE",
+        )
+        database.upsert_ynab_transaction(txn)
+
+        with pytest.raises(ValueError, match="No pending change"):
+            categorizer_service.undo_category(txn)
+
+    def test_undo_split_clears_pending_splits(self, categorizer_service, database):
+        """Test that undoing a split also clears pending_splits."""
+        txn = Transaction(
+            id="txn-undo-split-001",
+            date=datetime(2024, 1, 15),
+            amount=-100.00,
+            payee_name="AMAZON.COM",
+            category_id=None,
+            category_name=None,
+            sync_status="synced",
+        )
+        database.upsert_ynab_transaction(txn)
+
+        splits = [
+            {"category_id": "cat-001", "category_name": "Electronics", "amount": -50.00},
+            {"category_id": "cat-002", "category_name": "Home", "amount": -50.00},
+        ]
+        categorizer_service.apply_split_categories(txn, splits)
+
+        # Verify splits exist
+        assert len(database.get_pending_splits(txn.id)) == 2
+
+        # Undo
+        categorizer_service.undo_category(txn)
+
+        # Verify splits are cleared
+        assert len(database.get_pending_splits(txn.id)) == 0
+
+
+class TestApproveTransaction:
+    """Tests for approve_transaction method."""
+
+    @pytest.fixture
+    def unapproved_transaction(self, database):
+        """Create an unapproved transaction."""
+        txn = Transaction(
+            id="txn-approve-001",
+            date=datetime(2024, 1, 15),
+            amount=-50.00,
+            payee_name="TEST STORE",
+            category_id="cat-001",
+            category_name="Electronics",
+            approved=False,
+            sync_status="synced",
+        )
+        database.upsert_ynab_transaction(txn)
+        return txn
+
+    def test_approve_sets_approved_flag(self, categorizer_service, unapproved_transaction):
+        """Test that approve_transaction sets approved to True."""
+        result = categorizer_service.approve_transaction(unapproved_transaction)
+        assert result.approved is True
+        assert result.sync_status == "pending_push"
+
+    def test_approve_creates_pending_change(
+        self, categorizer_service, unapproved_transaction, database
+    ):
+        """Test that approve creates a pending change record."""
+        categorizer_service.approve_transaction(unapproved_transaction)
+        pending = database.get_pending_change(unapproved_transaction.id)
+        assert pending is not None
+        assert pending["change_type"] == "approve"
+        assert pending["new_approved"] == 1
+
+    def test_approve_already_approved_is_noop(self, categorizer_service, database):
+        """Test that approving an already approved transaction is a no-op."""
+        txn = Transaction(
+            id="txn-already-approved",
+            date=datetime(2024, 1, 15),
+            amount=-50.00,
+            payee_name="TEST STORE",
+            approved=True,
+            sync_status="synced",
+        )
+        database.upsert_ynab_transaction(txn)
+
+        result = categorizer_service.approve_transaction(txn)
+
+        # Should return unchanged
+        assert result.sync_status == "synced"
+        # No pending change created
+        assert database.get_pending_change(txn.id) is None
+
+
+class TestGetAmazonOrderItems:
+    """Tests for get_amazon_order_items_with_prices method."""
+
+    def test_get_amazon_order_items(self, categorizer_service, database, add_order_to_db):
+        """Test getting Amazon order items with prices."""
+        # Add an order with items
+        add_order_to_db("order-items-001", datetime(2024, 1, 15), 50.00, ["Item A", "Item B"])
+
+        # Get items
+        items = categorizer_service.get_amazon_order_items_with_prices("order-items-001")
+        assert len(items) == 2
+        names = [i["item_name"] for i in items]
+        assert "Item A" in names
+        assert "Item B" in names
+
+
+class TestGetPendingSplits:
+    """Tests for get_pending_splits method."""
+
+    def test_get_pending_splits(self, categorizer_service, database):
+        """Test getting pending splits for a transaction."""
+        txn = Transaction(
+            id="txn-pending-splits-001",
+            date=datetime(2024, 1, 15),
+            amount=-100.00,
+            payee_name="TEST STORE",
+            sync_status="synced",
+        )
+        database.upsert_ynab_transaction(txn)
+
+        splits = [
+            {
+                "category_id": "cat-001",
+                "category_name": "Electronics",
+                "amount": -60.00,
+                "memo": "Test",
+            },
+            {"category_id": "cat-002", "category_name": "Home", "amount": -40.00},
+        ]
+        categorizer_service.apply_split_categories(txn, splits)
+
+        # Get pending splits via service method
+        result = categorizer_service.get_pending_splits(txn.id)
+        assert len(result) == 2
+
+
+class TestBudgetMethods:
+    """Tests for budget-related methods."""
+
+    def test_get_budget_name(self, categorizer_service):
+        """Test getting budget name."""
+        name = categorizer_service.get_budget_name()
+        assert name == "Mock Budget"
+
+    def test_get_budget_name_with_id(self, categorizer_service):
+        """Test getting budget name by specific ID."""
+        name = categorizer_service.get_budget_name("mock-budget-id-2")
+        assert name == "Second Mock Budget"

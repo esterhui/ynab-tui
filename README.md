@@ -17,6 +17,11 @@ A terminal user interface for categorizing YNAB (You Need A Budget) transactions
 - **Split transaction support** - Split Amazon orders into individual items with separate categories
 - **Historical pattern learning** - Learns from your categorization decisions for recurring payees
 - **Git-style workflow** - Pull transactions to local DB, categorize offline, push changes back
+- **Multi-budget support** - Switch between YNAB budgets
+- **Advanced filtering** - Filter transactions by category, payee, or status
+- **Bulk tagging** - Tag multiple transactions for batch operations
+- **Undo support** - Revert categorizations before pushing
+- **CSV export** - Export transaction data for external analysis
 - **Mock mode** - Test without real credentials using synthetic data
 
 ## Installation
@@ -70,6 +75,12 @@ uv run python -m src.main --mock
 - `u` - Undo last change
 - `p` - Preview pending changes
 - `/` - Search transactions
+- `f` - Cycle filter (all/approved/uncategorized/pending)
+- `t` - Tag transaction for bulk operations
+- `T` - Clear all tags
+- `b` - Switch budget
+- `s` - Settings
+- `?` - Help
 - `q` - Quit
 
 ### CLI Commands
@@ -84,8 +95,14 @@ uv run python -m src.main push --dry-run    # Preview what would be pushed
 # List uncategorized transactions
 uv run python -m src.main uncategorized
 
-# Database status
-uv run python -m src.main db-status
+# Database inspection
+uv run python -m src.main db-status         # Show sync status and statistics
+uv run python -m src.main db-deltas         # Show pending changes before push
+uv run python -m src.main ynab-budgets      # List available budgets
+
+# Category mappings (learn from history)
+uv run python -m src.main mappings          # Query learned item->category mappings
+uv run python -m src.main mappings-create   # Build mappings from approved transactions
 
 # Test connections
 uv run python -m src.main ynab-test

@@ -366,18 +366,6 @@ class MockYNABClient:
             "user_id": "mock-user-id",
         }
 
-    def get_payee_transactions(
-        self,
-        payee_name: str,
-        limit: int = 100,
-    ) -> list[Transaction]:
-        """Get transactions for a payee."""
-        payee_lower = payee_name.lower()
-        matching = [
-            t for t in self._transactions if t.payee_name and payee_lower in t.payee_name.lower()
-        ]
-        return self._sorted_by_date(matching, limit)
-
     def _get_category_name(self, category_id: str) -> Optional[str]:
         """Look up category name by ID."""
         for group in self._categories.groups:
