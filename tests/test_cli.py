@@ -374,3 +374,125 @@ class TestAmazonMatchCommand:
         """Test amazon-match --verbose option."""
         result = cli_runner.invoke(main, ["--mock", "amazon-match", "--verbose"])
         assert result.exit_code == 0
+
+
+class TestMappingsCommandFilters:
+    """Tests for the mappings command with filters."""
+
+    def test_mappings_with_item_filter(self, cli_runner, isolated_mock_env):
+        """Test mappings --item filter."""
+        result = cli_runner.invoke(main, ["--mock", "mappings", "--item", "cable"])
+        assert result.exit_code == 0
+        # Should show results or "no mappings" message
+        assert "mapping" in result.output.lower()
+
+    def test_mappings_with_category_filter(self, cli_runner, isolated_mock_env):
+        """Test mappings --category filter."""
+        result = cli_runner.invoke(main, ["--mock", "mappings", "--category", "electronics"])
+        assert result.exit_code == 0
+
+    def test_mappings_with_limit(self, cli_runner, isolated_mock_env):
+        """Test mappings -n limit."""
+        result = cli_runner.invoke(main, ["--mock", "mappings", "-n", "10"])
+        assert result.exit_code == 0
+
+
+class TestPushCommandExtended:
+    """Extended tests for the push command."""
+
+    def test_push_with_yes_flag(self, cli_runner, isolated_mock_env):
+        """Test push --yes skips confirmation."""
+        result = cli_runner.invoke(main, ["--mock", "push", "--yes"])
+        assert result.exit_code == 0
+        # Should show "no pending" or push result
+        assert "pending" in result.output.lower() or "Push" in result.output
+
+    def test_push_cancelled(self, cli_runner, isolated_mock_env, monkeypatch):
+        """Test push can be cancelled at confirmation."""
+        # First add some data then create a pending change
+        monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
+        monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+
+        # Try to push but cancel
+        result = cli_runner.invoke(main, ["--mock", "push"], input="n\n")
+        assert result.exit_code == 0
+        # Either cancelled or no pending changes
+        assert "Cancelled" in result.output or "No pending" in result.output
+
+
+class TestUndoCommandExtended:
+    """Extended tests for the undo command."""
+
+    def test_undo_all_cancelled(self, cli_runner, isolated_mock_env):
+        """Test undo --all can be cancelled."""
+        result = cli_runner.invoke(main, ["--mock", "undo", "--all"], input="n\n")
+        assert result.exit_code == 0
+        # Either cancelled or no pending changes
+        assert "Cancelled" in result.output or "No pending" in result.output
+
+    def test_undo_all_confirmed(self, cli_runner, isolated_mock_env):
+        """Test undo --all with confirmation."""
+        result = cli_runner.invoke(main, ["--mock", "undo", "--all"], input="y\n")
+        assert result.exit_code == 0
+        # Either undone or no pending changes
+        assert "Undone" in result.output or "No pending" in result.output
+
+    def test_undo_shows_usage(self, cli_runner, isolated_mock_env):
+        """Test undo without args shows usage."""
+        result = cli_runner.invoke(main, ["--mock", "undo"])
+        assert result.exit_code == 0
+        assert "transaction ID" in result.output or "--all" in result.output
+
+
+class TestDBClearCommandExtended:
+    """Extended tests for the db-clear command."""
+
+    def test_db_clear_with_yes_flag(self, cli_runner, isolated_mock_env):
+        """Test db-clear --yes skips confirmation."""
+        result = cli_runner.invoke(main, ["--mock", "db-clear", "--yes"])
+        assert result.exit_code == 0
+        assert "Cleared" in result.output
+
+    def test_db_clear_shows_counts(self, cli_runner, isolated_mock_env, monkeypatch):
+        """Test db-clear shows current database counts before clearing."""
+        # First add some data
+        monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
+        monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
+        cli_runner.invoke(main, ["--mock", "pull", "--full"])
+
+        # Clear (cancelled) to see counts
+        result = cli_runner.invoke(main, ["--mock", "db-clear"], input="n\n")
+        assert result.exit_code == 0
+        assert "Current database contents" in result.output
+        assert "Transactions:" in result.output
+
+
+class TestDBTransactionsCommandExtended:
+    """Extended tests for the db-transactions command."""
+
+    def test_db_transactions_with_multiple_filters(self, cli_runner, isolated_mock_env, monkeypatch):
+        """Test db-transactions with multiple filters combined."""
+        monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
+        monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+
+        result = cli_runner.invoke(
+            main, ["--mock", "db-transactions", "--uncategorized", "-n", "5"]
+        )
+        assert result.exit_code == 0
+
+
+class TestYNABUnapprovedCommandExtended:
+    """Extended tests for the ynab-unapproved command."""
+
+    def test_ynab_unapproved_with_data(self, cli_runner, isolated_mock_env, monkeypatch):
+        """Test ynab-unapproved after pulling data."""
+        monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
+        monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+
+        result = cli_runner.invoke(main, ["--mock", "ynab-unapproved"])
+        assert result.exit_code == 0
+        # Should show transactions or "no unapproved" message
+        assert "unapproved" in result.output.lower() or "Found" in result.output
