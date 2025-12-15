@@ -8,6 +8,8 @@
 
 A terminal user interface for categorizing YNAB (You Need A Budget) transactions with Amazon order matching.
 
+![YNAB TUI Screenshot](ynab-tui-screenshot.png)
+
 ## Features
 
 - **TUI for transaction review** - Review and categorize uncategorized transactions
