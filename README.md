@@ -90,6 +90,43 @@ uv run python -m src.main ynab-test
 uv run python -m src.main amazon-test
 ```
 
+### Makefile
+
+A Makefile is provided for common tasks. Run `make help` to see all available targets:
+
+```
+YNAB TUI
+
+Make targets:
+  make install    - Install dependencies
+  make run        - Launch TUI application
+  make test       - Run tests
+  make coverage   - Run tests with coverage report
+  make sloc       - Count lines of code (requires scc)
+  make check      - Lint code
+  make format     - Format code
+  make mock-data  - Generate synthetic mock CSV data (deterministic)
+  make mock-prod-data - Export production DB to mock CSV files
+  make clean      - Remove cache files
+
+Sync commands (git-style):
+  make pull       - Pull YNAB + Amazon data to local DB (incremental)
+  make pull-full  - Full pull of all data
+  make push       - Push local categorizations to YNAB
+  make push-dry   - Preview what would be pushed
+  make db-status  - Show database sync status
+
+CLI examples:
+  uv run python -m src.main                     # Launch TUI
+  uv run python -m src.main amazon-match        # Match Amazon transactions
+  uv run python -m src.main uncategorized       # List uncategorized transactions
+  uv run python -m src.main --help              # Show all commands
+
+Mock mode (no live APIs):
+  uv run python -m src.main --mock              # Launch TUI with mock data
+  uv run python -m src.main --mock db-clear     # Only clears mock DB
+```
+
 ## How It Works
 
 1. **Pull** transactions from YNAB and orders from Amazon to local SQLite database
