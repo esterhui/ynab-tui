@@ -35,7 +35,9 @@ def temp_db_path(tmp_path):
 @pytest.fixture
 def database(temp_db_path):
     """Create a test database instance."""
-    return Database(temp_db_path)
+    db = Database(temp_db_path)
+    yield db
+    db.close()
 
 
 @pytest.fixture(scope="session")

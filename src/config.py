@@ -87,7 +87,11 @@ class Config:
     categorization: CategorizationConfig = field(default_factory=CategorizationConfig)
     payees: PayeesConfig = field(default_factory=PayeesConfig)
     display: DisplayConfig = field(default_factory=DisplayConfig)
-    data_dir: Path = field(default_factory=lambda: Path.home() / ".config" / "ynab-tui")
+    data_dir: Path = field(
+        default_factory=lambda: Path(
+            os.environ.get("YNAB_TUI_DATA_DIR", str(Path.home() / ".config" / "ynab-tui"))
+        )
+    )
 
     def __post_init__(self):
         """Ensure data directory exists."""
