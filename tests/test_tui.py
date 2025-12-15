@@ -90,6 +90,9 @@ class TestTUIFilterNavigation:
                 await pilot.pause()
                 assert tui_app._filter_mode == expected_mode
 
+            # Wait for all workers (filter changes trigger _load_transactions workers)
+            await tui_app.workers.wait_for_complete()
+
     async def test_filter_rapid_pressing(self, tui_app):
         """Test rapid filter key presses don't crash."""
         async with tui_app.run_test() as pilot:
@@ -326,9 +329,8 @@ class TestTUIPushPreview:
             # Press 'y' to confirm push
             await pilot.press("y")
 
-            # Wait for worker to complete
-            await pilot.pause()
-            await pilot.pause()  # Extra pause for worker
+            # Wait for all workers to complete (push worker + reload worker)
+            await tui_app_with_pending.workers.wait_for_complete()
 
             # Should return to main screen
             from src.tui.screens import PushPreviewScreen
