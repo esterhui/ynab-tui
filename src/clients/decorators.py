@@ -131,6 +131,7 @@ def with_retry(
             # Should not reach here, but just in case
             if last_exception:
                 raise last_exception
+            return None
 
         return wrapper  # type: ignore
 

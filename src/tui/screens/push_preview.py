@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal
+from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.widgets import Footer, Header, ListItem, ListView, ProgressBar, Static
 from textual.worker import Worker, WorkerState
@@ -323,7 +324,7 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
         try:
             status_bar = self.query_one("#status-bar", Static)
             status_bar.update(message)
-        except Exception:
+        except NoMatches:
             pass
 
     def _update_progress(self, current: int, total: int) -> None:
@@ -339,7 +340,7 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
 
             progress_bar = self.query_one("#progress-bar", ProgressBar)
             progress_bar.update(total=total, progress=current)
-        except Exception:
+        except NoMatches:
             pass
 
     def _show_progress_bar(self) -> None:
@@ -347,7 +348,7 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
         try:
             container = self.query_one("#progress-container")
             container.remove_class("--hidden")
-        except Exception:
+        except NoMatches:
             pass
 
     def _hide_progress_bar(self) -> None:
@@ -355,5 +356,5 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
         try:
             container = self.query_one("#progress-container")
             container.add_class("--hidden")
-        except Exception:
+        except NoMatches:
             pass

@@ -232,7 +232,7 @@ class AmazonClient:
             try:
                 total = float(total_str)
             except ValueError:
-                pass
+                total = 0.0  # Keep default on parse failure
 
         return AmazonOrder(
             order_id=order.order_number if hasattr(order, "order_number") else "",

@@ -5,6 +5,7 @@ from typing import Optional
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical, VerticalScroll
+from textual.css.query import NoMatches
 from textual.message import Message
 from textual.widgets import Input, Static
 
@@ -210,7 +211,7 @@ class CategoryPicker(NavigationMixin, Vertical):
             # Find the highlighted item
             item = self.query_one(".category-item.--highlight")
             item.scroll_visible()
-        except Exception:
+        except NoMatches:
             pass
 
     def action_select_category(self) -> None:

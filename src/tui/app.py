@@ -10,6 +10,7 @@ from typing import Optional
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal
+from textual.css.query import NoMatches
 from textual.timer import Timer
 from textual.widgets import Footer, ListItem, ListView, Static
 
@@ -542,7 +543,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                 txn_list.highlighted_child, TransactionListItem
             ):
                 txn_list.highlighted_child.update_content()
-        except Exception:
+        except NoMatches:
             pass
 
     def action_clear_all_tags(self) -> None:
@@ -562,7 +563,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             for child in txn_list.children:
                 if isinstance(child, TransactionListItem) and child.txn.id in ids_to_update:
                     child.update_content()
-        except Exception:
+        except NoMatches:
             pass
 
         self.notify(f"Cleared {count} tag(s)", timeout=2)
@@ -672,7 +673,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                 item = txn_list.highlighted_child
                 if isinstance(item, TransactionListItem):
                     return item.txn
-        except Exception:
+        except NoMatches:
             pass
         return None
 

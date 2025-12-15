@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **IMPORTANT:** Always run "make check" before committing any work
 
+**IMPORTANT:** Check GitHub code scanning alerts before pushing (`gh api repos/{owner}/{repo}/code-scanning/alerts`)
+
 ## Project Overview
 
 YNAB TUI is a transaction categorization tool for YNAB (You Need A Budget). It helps categorize uncategorized transactions by:
@@ -146,3 +148,12 @@ Vim-style navigation in `src/tui/app.py`:
 - Never use `git add -A`, always add specific files
 - YNAB amounts are in **milliunits** (divide by 1000 for dollars)
 - The database uses WAL mode for concurrent access
+- Check GitHub security/code-scanning before pushing:
+  ```bash
+  # Check for open alerts
+  gh api repos/{owner}/{repo}/code-scanning/alerts --jq '.[] | select(.state=="open")'
+  ```
+- Common CodeQL fixes:
+  - `py/ineffectual-statement`: Replace `...` with `pass` in Protocol methods
+  - `py/empty-except`: Use specific exceptions (e.g., `NoMatches` for Textual queries)
+  - `py/mixed-returns`: Add explicit `return None` at end of functions
