@@ -18,7 +18,9 @@ from src.tui.screens.item_split import ItemSplitScreen, SplitItemListItem
 @pytest.fixture
 def split_database(tmp_path):
     """Create a temporary database for screen tests."""
-    return Database(tmp_path / "test_screens.db")
+    db = Database(tmp_path / "test_screens.db")
+    yield db
+    db.close()
 
 
 @pytest.fixture

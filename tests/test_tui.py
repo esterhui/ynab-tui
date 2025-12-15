@@ -19,7 +19,8 @@ from src.tui.app import YNABCategorizerApp
 def tui_database(tmp_path):
     """Create a temporary database for TUI tests."""
     db = Database(tmp_path / "test_tui.db", budget_id="mock-budget-id")
-    return db
+    yield db
+    db.close()
 
 
 @pytest.fixture
