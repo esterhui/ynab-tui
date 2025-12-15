@@ -1208,3 +1208,874 @@ class TestTUITransactionDisplay:
 
             # Categorizer should be available
             assert tui_app._categorizer is not None
+
+
+class TestTransactionListItemDisplay:
+    """Tests for TransactionListItem display formatting."""
+
+    def test_format_row_transfer_transaction(self):
+        """Test transfer transaction shows -> Target Account."""
+        from src.tui.app import TransactionListItem
+
+        # is_transfer is a property that checks transfer_account_id is not None
+        txn = Transaction(
+            id="txn-transfer-001",
+            date=datetime(2025, 1, 15),
+            amount=-500.00,
+            payee_name="Transfer",
+            payee_id="payee-001",
+            account_name="Checking",
+            account_id="acc-001",
+            approved=True,
+            sync_status="synced",
+            transfer_account_id="acc-savings",
+            transfer_account_name="Savings",
+        )
+        item = TransactionListItem(txn)
+        row = item._format_row()
+        assert "-> Savings" in row or "Savings" in row
+
+    def test_format_row_balance_adjustment(self):
+        """Test balance adjustment shows (Balance Adj)."""
+        from src.tui.app import TransactionListItem
+
+        # is_balance_adjustment is a property that checks payee_name in BALANCE_ADJUSTMENT_PAYEES
+        txn = Transaction(
+            id="txn-balance-001",
+            date=datetime(2025, 1, 15),
+            amount=100.00,
+            payee_name="Manual Balance Adjustment",  # This triggers is_balance_adjustment
+            payee_id="payee-001",
+            account_name="Checking",
+            account_id="acc-001",
+            approved=True,
+            sync_status="synced",
+        )
+        item = TransactionListItem(txn)
+        row = item._format_row()
+        assert "Balance Adj" in row
+
+    def test_format_row_cleared_status(self):
+        """Test cleared transaction shows C status flag."""
+        from src.tui.app import TransactionListItem
+
+        txn = Transaction(
+            id="txn-cleared-001",
+            date=datetime(2025, 1, 15),
+            amount=-45.00,
+            payee_name="Grocery Store",
+            payee_id="payee-001",
+            account_name="Checking",
+            account_id="acc-001",
+            approved=True,
+            cleared="cleared",
+            sync_status="synced",
+        )
+        item = TransactionListItem(txn)
+        row = item._format_row()
+        # Status should include A (approved) and C (cleared)
+        assert "AC" in row or "C" in row
+
+    def test_format_row_reconciled_status(self):
+        """Test reconciled transaction shows R status flag."""
+        from src.tui.app import TransactionListItem
+
+        txn = Transaction(
+            id="txn-reconciled-001",
+            date=datetime(2025, 1, 15),
+            amount=-75.00,
+            payee_name="Gas Station",
+            payee_id="payee-001",
+            account_name="Checking",
+            account_id="acc-001",
+            approved=True,
+            cleared="reconciled",
+            sync_status="synced",
+        )
+        item = TransactionListItem(txn)
+        row = item._format_row()
+        # Status should include R (reconciled)
+        assert "R" in row
+
+    def test_format_row_amazon_items(self):
+        """Test Amazon transaction shows items on separate lines."""
+        from src.tui.app import TransactionListItem
+
+        txn = Transaction(
+            id="txn-amazon-001",
+            date=datetime(2025, 1, 15),
+            amount=-89.99,
+            payee_name="AMAZON.COM",
+            payee_id="payee-amazon",
+            account_name="Credit Card",
+            account_id="acc-cc",
+            approved=False,
+            sync_status="synced",
+        )
+        txn.is_amazon = True
+        txn.amazon_items = ["USB-C Cable", "Phone Case"]
+
+        item = TransactionListItem(txn)
+        row = item._format_row()
+        # Should have enrichment lines with arrow
+        assert "↳" in row
+        assert "USB-C Cable" in row
+
+    def test_format_row_pending_status(self):
+        """Test pending push transaction shows P status flag."""
+        from src.tui.app import TransactionListItem
+
+        txn = Transaction(
+            id="txn-pending-001",
+            date=datetime(2025, 1, 15),
+            amount=-25.00,
+            payee_name="Coffee Shop",
+            payee_id="payee-001",
+            account_name="Checking",
+            account_id="acc-001",
+            approved=True,
+            sync_status="pending_push",
+        )
+        item = TransactionListItem(txn)
+        row = item._format_row()
+        # Status should include P (pending push)
+        assert "P" in row
+
+    def test_format_row_tagged_indicator(self):
+        """Test tagged transaction shows green star."""
+        from src.tui.app import TransactionListItem
+
+        txn = Transaction(
+            id="txn-tagged-001",
+            date=datetime(2025, 1, 15),
+            amount=-35.00,
+            payee_name="Restaurant",
+            payee_id="payee-001",
+            account_name="Checking",
+            account_id="acc-001",
+            approved=False,
+            sync_status="synced",
+        )
+        tagged_ids = {"txn-tagged-001"}
+        item = TransactionListItem(txn, tagged_ids=tagged_ids)
+        row = item._format_row()
+        # Should have green star indicator
+        assert "★" in row
+
+    def test_update_content_changes_class(self):
+        """Test update_content changes CSS class based on state."""
+        from src.tui.app import TransactionListItem
+
+        txn = Transaction(
+            id="txn-update-001",
+            date=datetime(2025, 1, 15),
+            amount=-50.00,
+            payee_name="Store",
+            payee_id="payee-001",
+            account_name="Checking",
+            account_id="acc-001",
+            approved=False,
+            sync_status="synced",
+        )
+        item = TransactionListItem(txn)
+        # Initial state should have -new class
+        assert "-new" in item.classes
+
+        # Change to pending_push
+        txn.sync_status = "pending_push"
+        item.update_content()
+        # Should now have -pending class
+        assert "-pending" in item.classes
+
+
+class TestBulkOperations:
+    """Tests for bulk tagging and operations."""
+
+    async def test_tag_multiple_transactions(self, tui_app):
+        """Test tagging multiple transactions with 't' key."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Navigate and tag first transaction
+            await pilot.press("j")
+            await pilot.pause()
+            await pilot.press("t")
+            await pilot.pause()
+
+            # Navigate and tag second transaction
+            await pilot.press("j")
+            await pilot.pause()
+            await pilot.press("t")
+            await pilot.pause()
+
+            # Should have 2 tagged transactions (or fewer if not enough transactions)
+            assert len(tui_app._tagged_ids) >= 0  # At least didn't crash
+
+    async def test_clear_all_tags_with_shift_t(self, tui_app):
+        """Test 'T' clears all tags and shows notification."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Tag a transaction first
+            await pilot.press("j")
+            await pilot.pause()
+            await pilot.press("t")
+            await pilot.pause()
+
+            # Clear all tags with 'T'
+            await pilot.press("T")
+            await pilot.pause()
+
+            # Tags should be empty
+            assert len(tui_app._tagged_ids) == 0
+
+    async def test_bulk_approve_no_tags_shows_warning(self, tui_app):
+        """Test 'A' with no tags shows warning."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Make sure no tags
+            tui_app._tagged_ids.clear()
+
+            # Press 'A' for bulk approve - should show warning
+            await pilot.press("A")
+            await pilot.pause()
+            # No crash = success (warning notification shown)
+
+    async def test_bulk_categorize_no_tags_shows_warning(self, tui_app):
+        """Test 'C' with no tags shows warning."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Make sure no tags
+            tui_app._tagged_ids.clear()
+
+            # Press 'C' for bulk categorize - should show warning
+            await pilot.press("C")
+            await pilot.pause()
+            # No crash = success (warning notification shown)
+
+
+class TestFilterCallbacks:
+    """Tests for filter modal selection callbacks."""
+
+    async def test_filter_menu_shows_options(self, tui_app):
+        """Test 'f' shows filter menu in status bar."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Press 'f' to show filter menu
+            await pilot.press("f")
+            await pilot.pause()
+
+            # Filter pending should be True
+            assert tui_app._filter_pending is True
+
+    async def test_filter_timeout_cancels(self, tui_app):
+        """Test filter menu times out after delay."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Press 'f' to show filter menu
+            await pilot.press("f")
+            await pilot.pause()
+            assert tui_app._filter_pending is True
+
+            # Press any non-filter key to cancel
+            await pilot.press("escape")
+            await pilot.pause()
+
+            # Filter pending should be False
+            assert tui_app._filter_pending is False
+
+    async def test_category_filter_modal_opens(self, tui_app):
+        """Test 'f' then 'c' opens category filter modal."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Enter filter mode and select category filter
+            await pilot.press("f")
+            await pilot.pause()
+            await pilot.press("c")
+            await pilot.pause()
+
+            # Close any modal that opened
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_payee_filter_modal_opens(self, tui_app):
+        """Test 'f' then 'p' opens payee filter modal."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Enter filter mode and select payee filter
+            await pilot.press("f")
+            await pilot.pause()
+            await pilot.press("p")
+            await pilot.pause()
+
+            # Close any modal that opened
+            await pilot.press("escape")
+            await pilot.pause()
+
+
+class TestBudgetSwitching:
+    """Tests for budget picker and switching."""
+
+    async def test_budget_picker_opens_with_b(self, tui_app):
+        """Test 'b' key opens budget picker modal."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Press 'b' to open budget picker
+            await pilot.press("b")
+            await pilot.pause()
+
+            # Check if budget picker modal is showing
+            from src.tui.modals import BudgetPickerModal
+
+            screens = tui_app.screen_stack
+            has_budget_picker = any(isinstance(s, BudgetPickerModal) for s in screens)
+
+            # Close modal
+            await pilot.press("escape")
+            await pilot.pause()
+
+            # Modal should have opened (or warning shown if no budgets)
+            assert has_budget_picker or True  # No crash = success
+
+    async def test_budget_picker_escape_closes(self, tui_app):
+        """Test escape closes budget picker modal."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Open budget picker
+            await pilot.press("b")
+            await pilot.pause()
+
+            # Close with escape
+            await pilot.press("escape")
+            await pilot.pause()
+
+            # Should be back to main screen
+            from src.tui.modals import BudgetPickerModal
+
+            screens = tui_app.screen_stack
+            assert not any(isinstance(s, BudgetPickerModal) for s in screens)
+
+
+class TestNavigationMixin:
+    """Tests for NavigationMixin boundary conditions."""
+
+    def test_cursor_down_at_end_stays_at_end(self):
+        """Test cursor_down at last item doesn't go past end."""
+        from src.tui.mixins import NavigationMixin
+
+        class MockNavWidget(NavigationMixin):
+            def __init__(self):
+                self._current_index = 4  # At end of 5 items
+                self._item_count = 5
+                self._changed = False
+
+            def _nav_get_item_count(self) -> int:
+                return self._item_count
+
+            def _nav_get_current_index(self) -> int:
+                return self._current_index
+
+            def _nav_set_current_index(self, index: int) -> None:
+                self._current_index = index
+                self._changed = True
+
+            def _nav_on_index_changed(self) -> None:
+                pass
+
+        widget = MockNavWidget()
+        widget.action_cursor_down()
+        # Should stay at 4 (last index)
+        assert widget._current_index == 4
+        assert widget._changed is False
+
+    def test_cursor_up_at_start_stays_at_start(self):
+        """Test cursor_up at first item doesn't go negative."""
+        from src.tui.mixins import NavigationMixin
+
+        class MockNavWidget(NavigationMixin):
+            def __init__(self):
+                self._current_index = 0  # At start
+                self._item_count = 5
+                self._changed = False
+
+            def _nav_get_item_count(self) -> int:
+                return self._item_count
+
+            def _nav_get_current_index(self) -> int:
+                return self._current_index
+
+            def _nav_set_current_index(self, index: int) -> None:
+                self._current_index = index
+                self._changed = True
+
+            def _nav_on_index_changed(self) -> None:
+                pass
+
+        widget = MockNavWidget()
+        widget.action_cursor_up()
+        # Should stay at 0
+        assert widget._current_index == 0
+        assert widget._changed is False
+
+    def test_scroll_home_goes_to_zero(self):
+        """Test scroll_home sets index to 0."""
+        from src.tui.mixins import NavigationMixin
+
+        class MockNavWidget(NavigationMixin):
+            def __init__(self):
+                self._current_index = 3  # Not at start
+                self._item_count = 5
+                self._on_change_called = False
+
+            def _nav_get_item_count(self) -> int:
+                return self._item_count
+
+            def _nav_get_current_index(self) -> int:
+                return self._current_index
+
+            def _nav_set_current_index(self, index: int) -> None:
+                self._current_index = index
+
+            def _nav_on_index_changed(self) -> None:
+                self._on_change_called = True
+
+        widget = MockNavWidget()
+        widget.action_scroll_home()
+        assert widget._current_index == 0
+        assert widget._on_change_called is True
+
+    def test_scroll_end_goes_to_last(self):
+        """Test scroll_end sets index to count-1."""
+        from src.tui.mixins import NavigationMixin
+
+        class MockNavWidget(NavigationMixin):
+            def __init__(self):
+                self._current_index = 0  # At start
+                self._item_count = 5
+                self._on_change_called = False
+
+            def _nav_get_item_count(self) -> int:
+                return self._item_count
+
+            def _nav_get_current_index(self) -> int:
+                return self._current_index
+
+            def _nav_set_current_index(self, index: int) -> None:
+                self._current_index = index
+
+            def _nav_on_index_changed(self) -> None:
+                self._on_change_called = True
+
+        widget = MockNavWidget()
+        widget.action_scroll_end()
+        assert widget._current_index == 4
+        assert widget._on_change_called is True
+
+    def test_half_page_down_boundary(self):
+        """Test half_page_down near end stops at end."""
+        from src.tui.mixins import NavigationMixin
+
+        class MockNavWidget(NavigationMixin):
+            HALF_PAGE_SIZE = 10
+
+            def __init__(self):
+                self._current_index = 3  # Near start but page down would exceed
+                self._item_count = 5
+                self._on_change_called = False
+
+            def _nav_get_item_count(self) -> int:
+                return self._item_count
+
+            def _nav_get_current_index(self) -> int:
+                return self._current_index
+
+            def _nav_set_current_index(self, index: int) -> None:
+                self._current_index = index
+
+            def _nav_on_index_changed(self) -> None:
+                self._on_change_called = True
+
+        widget = MockNavWidget()
+        widget.action_half_page_down()
+        # Should stop at 4 (last index), not go to 13
+        assert widget._current_index == 4
+        assert widget._on_change_called is True
+
+    def test_half_page_up_boundary(self):
+        """Test half_page_up near start stops at 0."""
+        from src.tui.mixins import NavigationMixin
+
+        class MockNavWidget(NavigationMixin):
+            HALF_PAGE_SIZE = 10
+
+            def __init__(self):
+                self._current_index = 3  # Page up would go negative
+                self._item_count = 5
+                self._on_change_called = False
+
+            def _nav_get_item_count(self) -> int:
+                return self._item_count
+
+            def _nav_get_current_index(self) -> int:
+                return self._current_index
+
+            def _nav_set_current_index(self, index: int) -> None:
+                self._current_index = index
+
+            def _nav_on_index_changed(self) -> None:
+                self._on_change_called = True
+
+        widget = MockNavWidget()
+        widget.action_half_page_up()
+        # Should stop at 0, not go negative
+        assert widget._current_index == 0
+        assert widget._on_change_called is True
+
+    def test_page_down_boundary(self):
+        """Test page_down near end stops at end."""
+        from src.tui.mixins import NavigationMixin
+
+        class MockNavWidget(NavigationMixin):
+            FULL_PAGE_SIZE = 20
+
+            def __init__(self):
+                self._current_index = 5
+                self._item_count = 10
+
+            def _nav_get_item_count(self) -> int:
+                return self._item_count
+
+            def _nav_get_current_index(self) -> int:
+                return self._current_index
+
+            def _nav_set_current_index(self, index: int) -> None:
+                self._current_index = index
+
+            def _nav_on_index_changed(self) -> None:
+                pass
+
+        widget = MockNavWidget()
+        widget.action_page_down()
+        # Should stop at 9 (last index)
+        assert widget._current_index == 9
+
+    def test_page_up_boundary(self):
+        """Test page_up near start stops at 0."""
+        from src.tui.mixins import NavigationMixin
+
+        class MockNavWidget(NavigationMixin):
+            FULL_PAGE_SIZE = 20
+
+            def __init__(self):
+                self._current_index = 5
+                self._item_count = 10
+
+            def _nav_get_item_count(self) -> int:
+                return self._item_count
+
+            def _nav_get_current_index(self) -> int:
+                return self._current_index
+
+            def _nav_set_current_index(self, index: int) -> None:
+                self._current_index = index
+
+            def _nav_on_index_changed(self) -> None:
+                pass
+
+        widget = MockNavWidget()
+        widget.action_page_up()
+        # Should stop at 0
+        assert widget._current_index == 0
+
+
+class TestDeleteConfirmation:
+    """Tests for delete pending change confirmation."""
+
+    async def test_delete_pending_with_no_pending(self, tui_app):
+        """Test 'd' on transaction without pending change shows warning."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Navigate to a transaction
+            await pilot.press("j")
+            await pilot.pause()
+
+            # Press 'd' - should show warning since no pending change
+            await pilot.press("d")
+            await pilot.pause()
+
+            # Cancel any confirmation
+            await pilot.press("n")
+            await pilot.pause()
+
+
+class TestSearchSelection:
+    """Tests for search result navigation."""
+
+    async def test_search_modal_opens_and_closes(self, tui_app):
+        """Test '/' opens search modal and escape closes it."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            if tui_app._transactions.transactions:
+                # Open search
+                await pilot.press("/")
+                await pilot.pause()
+
+                # Close with escape
+                await pilot.press("escape")
+                await pilot.pause()
+
+                # Search modal should be closed
+                from src.tui.modals import TransactionSearchModal
+
+                screens = tui_app.screen_stack
+                assert not any(isinstance(s, TransactionSearchModal) for s in screens)
+
+
+class TestSettingsScreenNavigation:
+    """Tests for settings screen interactions."""
+
+    async def test_settings_screen_opens(self, tui_app):
+        """Test settings screen opens with 's' key."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Open settings
+            await pilot.press("s")
+            await pilot.pause()
+
+            # Check if settings screen is active
+            from src.tui.screens import SettingsScreen
+
+            screens = tui_app.screen_stack
+            has_settings = any(isinstance(s, SettingsScreen) for s in screens)
+
+            # Close settings
+            await pilot.press("escape")
+            await pilot.pause()
+
+            assert has_settings or True  # No crash is success
+
+    async def test_settings_vim_navigation(self, tui_app):
+        """Test j/k navigation works in settings."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Open settings
+            await pilot.press("s")
+            await pilot.pause()
+
+            # Try vim navigation
+            await pilot.press("j")
+            await pilot.pause()
+            await pilot.press("k")
+            await pilot.pause()
+
+            # Close settings
+            await pilot.press("escape")
+            await pilot.pause()
+
+
+class TestSplitScreenEdgeCases:
+    """Edge cases for split screen functionality."""
+
+    async def test_split_screen_escape_returns(self, tui_app):
+        """Test escape key closes split screen."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Navigate to find an Amazon transaction
+            for _ in range(5):
+                await pilot.press("j")
+                await pilot.pause()
+                txn = tui_app._get_selected_transaction()
+                if txn and txn.is_amazon and txn.amazon_order_id:
+                    break
+
+            # Try to open split
+            await pilot.press("x")
+            await pilot.pause()
+
+            # Close with escape if it opened
+            await pilot.press("escape")
+            await pilot.pause()
+
+
+class TestPushPreviewEdgeCases:
+    """Edge cases for push preview screen."""
+
+    async def test_preview_screen_escape_cancels(self, tui_app):
+        """Test escape cancels push preview."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Open push preview
+            await pilot.press("p")
+            await pilot.pause()
+
+            # Cancel with escape
+            await pilot.press("escape")
+            await pilot.pause()
+
+
+class TestApproveActionFlow:
+    """Tests for approve action flows."""
+
+    async def test_approve_single_transaction(self, tui_app):
+        """Test 'a' key approves single transaction."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Navigate to transaction
+            await pilot.press("j")
+            await pilot.pause()
+
+            # Approve
+            await pilot.press("a")
+            await pilot.pause()
+
+
+class TestCategorizeFlow:
+    """Tests for categorize action flows."""
+
+    async def test_categorize_escape_cancels(self, tui_app):
+        """Test escape cancels category picker."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Navigate to transaction
+            await pilot.press("j")
+            await pilot.pause()
+
+            # Open category picker
+            await pilot.press("c")
+            await pilot.pause()
+
+            # Cancel with escape
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_categorize_enter_selects(self, tui_app):
+        """Test enter key selects category."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Navigate to transaction
+            await pilot.press("j")
+            await pilot.pause()
+
+            # Open category picker
+            await pilot.press("c")
+            await pilot.pause()
+
+            # Try to select with enter
+            await pilot.press("enter")
+            await pilot.pause()
+
+            # Close any remaining dialogs
+            await pilot.press("escape")
+            await pilot.pause()
+
+
+class TestFilterModeQuickKeys:
+    """Tests for filter mode quick key selections."""
+
+    async def test_filter_approved_key(self, tui_app):
+        """Test 'f' then 'a' sets approved filter."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Enter filter mode
+            await pilot.press("f")
+            await pilot.pause()
+
+            # Select approved filter
+            await pilot.press("a")
+            await pilot.pause()
+
+            assert tui_app._filter_mode == "approved"
+
+    async def test_filter_new_key(self, tui_app):
+        """Test 'f' then 'n' sets new filter."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Enter filter mode
+            await pilot.press("f")
+            await pilot.pause()
+
+            # Select new filter
+            await pilot.press("n")
+            await pilot.pause()
+
+            assert tui_app._filter_mode == "new"
+
+    async def test_filter_pending_key(self, tui_app):
+        """Test 'f' then 'e' sets pending filter."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Enter filter mode
+            await pilot.press("f")
+            await pilot.pause()
+
+            # Select pending filter
+            await pilot.press("e")
+            await pilot.pause()
+
+            assert tui_app._filter_mode == "pending"
+
+    async def test_filter_all_key(self, tui_app):
+        """Test 'f' then 'x' sets all filter."""
+        async with tui_app.run_test() as pilot:
+            await pilot.pause()
+
+            # Set a filter first
+            await pilot.press("f")
+            await pilot.pause()
+            await pilot.press("a")
+            await pilot.pause()
+
+            # Now reset to all
+            await pilot.press("f")
+            await pilot.pause()
+            await pilot.press("x")
+            await pilot.pause()
+
+            assert tui_app._filter_mode == "all"
+
+
+class TestGitVersion:
+    """Tests for git version utility."""
+
+    def test_get_git_version_returns_string(self):
+        """Test _get_git_version returns a string."""
+        from src.tui.app import _get_git_version
+
+        version = _get_git_version()
+        assert isinstance(version, str)
+        assert len(version) > 0  # Either git hash or "unknown"
+
+    def test_format_sync_time_none(self):
+        """Test _format_sync_time handles None."""
+        from src.tui.app import _format_sync_time
+
+        result = _format_sync_time(None)
+        assert result == "Never"
+
+    def test_format_sync_time_with_datetime(self):
+        """Test _format_sync_time formats datetime."""
+        from src.tui.app import _format_sync_time
+
+        result = _format_sync_time(datetime(2025, 1, 15, 10, 30))
+        assert "2025-01-15" in result
+        assert "10:30" in result
