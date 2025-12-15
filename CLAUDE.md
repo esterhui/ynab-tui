@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **IMPORTANT:** Never clear the production database unless you ask the user and get permission
 
+**IMPORTANT:** Always run "make format" before committing any work
+
 ## Project Overview
 
 YNAB TUI is a transaction categorization tool for YNAB (You Need A Budget). It helps categorize uncategorized transactions by:

@@ -503,7 +503,11 @@ class TestDisplayAmazonMatchResults:
             order_id="order-123",
             order_date=datetime(2024, 6, 14),
             total=47.82,
-            items=["Very Long Item Name Number One", "Another Extremely Long Item Name", "Third Item"],
+            items=[
+                "Very Long Item Name Number One",
+                "Another Extremely Long Item Name",
+                "Third Item",
+            ],
             fetched_at=datetime(2024, 6, 15),
         )
         result = AmazonMatchResult(

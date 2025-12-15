@@ -471,7 +471,9 @@ class TestDBClearCommandExtended:
 class TestDBTransactionsCommandExtended:
     """Extended tests for the db-transactions command."""
 
-    def test_db_transactions_with_multiple_filters(self, cli_runner, isolated_mock_env, monkeypatch):
+    def test_db_transactions_with_multiple_filters(
+        self, cli_runner, isolated_mock_env, monkeypatch
+    ):
         """Test db-transactions with multiple filters combined."""
         monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
