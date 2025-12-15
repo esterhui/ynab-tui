@@ -37,7 +37,7 @@ cp config.example.toml ~/.config/ynab-tui/config.toml
 
 Required credentials:
 - **YNAB API token** - Get from https://app.ynab.com/settings/developer
-- **Amazon credentials** - Your Amazon login (for order history scraping)
+- **Amazon credentials** - Your Amazon login (for order history scraping via [amazon-orders](https://github.com/alexdlaird/amazon-orders))
 
 You can also use environment variables:
 ```bash
@@ -97,6 +97,47 @@ uv run python -m src.main amazon-test
 3. **Review** uncategorized transactions in the TUI
 4. **Categorize** using the category picker or split into individual items
 5. **Push** your changes back to YNAB
+
+### Typical Workflow
+
+**First time setup:**
+```bash
+# Do a full pull to download all YNAB transactions and Amazon order history
+uv run python -m src.main pull --full
+```
+
+**Ongoing usage:**
+```bash
+# 1. Pull new transactions (incremental - only fetches recent changes)
+uv run python -m src.main pull
+
+# 2. Launch the TUI to review and categorize
+uv run python -m src.main
+
+# 3. In the TUI: navigate with j/k, categorize with 'c', approve with 'a'
+#    For Amazon orders, use 'x' to split into individual items
+
+# 4. Push your changes back to YNAB (from CLI or use 'P' in TUI)
+uv run python -m src.main push
+
+# Optional: preview changes before pushing
+uv run python -m src.main push --dry-run
+```
+
+### Amazon Order Matching
+
+YNAB transactions from Amazon typically show as "Amazon.com" with just the total amount, making it difficult to know what you actually purchased. This tool uses [amazon-orders](https://github.com/alexdlaird/amazon-orders) to scrape your Amazon order history and match transactions to specific orders.
+
+**How matching works:**
+- Matches by amount (within $0.10 tolerance) and date (7-day window, extended to 24 days if needed)
+- Once matched, the TUI shows the actual items purchased instead of just "Amazon.com"
+- You can then categorize the whole order, or use split (`x`) to break it into individual items with separate categories
+
+**Example:** A $45.67 Amazon transaction gets matched to an order containing:
+- Book: "Clean Code" - $29.99 → Categorize as "Books"
+- USB Cable - $15.68 → Categorize as "Electronics"
+
+This makes Amazon transactions much easier to categorize accurately.
 
 ## Development
 
