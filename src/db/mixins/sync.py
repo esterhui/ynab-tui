@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
-from .base import _date_str, _now_iso
+from .base import DatabaseMixin, _date_str, _now_iso
 
 
-class SyncMixin:
+class SyncMixin(DatabaseMixin):
     """Mixin for sync state database operations."""
 
     def _get_sync_key(self, base_key: str) -> str:
@@ -25,7 +25,7 @@ class SyncMixin:
             return f"{base_key}:{budget_id}"
         return base_key
 
-    def get_sync_state(self, key: str) -> Optional[dict]:
+    def get_sync_state(self, key: str) -> Optional[dict[str, Any]]:
         """Get sync state for a given key.
 
         Args:

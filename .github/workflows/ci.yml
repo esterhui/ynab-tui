@@ -15,8 +15,8 @@ env:
   PYTHON_VERSION: "3.13"
 
 jobs:
-  lint:
-    name: Lint
+  check:
+    name: Check (lint + typecheck)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,8 +25,12 @@ jobs:
           enable-cache: true
       - run: uv python install ${{ env.PYTHON_VERSION }}
       - run: uv sync --all-extras
-      - run: uv run ruff check src/ tests/
-      - run: uv run ruff format --check src/ tests/
+      - name: Lint
+        run: |
+          uv run ruff check src/ tests/
+          uv run ruff format --check src/ tests/
+      - name: Type Check
+        run: uv run mypy src/
 
   test:
     name: Test (Python ${{ matrix.python-version }})

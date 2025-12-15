@@ -12,7 +12,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from ..clients import YNABClient
+from ..clients.protocols import YNABClientProtocol
 from ..config import Config
 from ..db.database import Database, TransactionFilter
 from ..models import (
@@ -34,7 +34,7 @@ class CategorizerService:
     def __init__(
         self,
         config: Config,
-        ynab_client: YNABClient,
+        ynab_client: YNABClientProtocol,
         db: Database,
     ):
         """Initialize categorizer service.
@@ -72,7 +72,7 @@ class CategorizerService:
             parts.append(f"{pct:.0f}% {cat}")
         return ", ".join(parts)
 
-    def _get_original_values(self, transaction: "Transaction") -> dict[str, Optional[str | bool]]:
+    def _get_original_values(self, transaction: "Transaction") -> dict[str, str | bool | None]:
         """Get original values for a transaction, preserving first originals if pending.
 
         When a transaction already has a pending change, we keep the very first
@@ -280,15 +280,18 @@ class CategorizerService:
         originals = self._get_original_values(transaction)
 
         # Create pending change in delta table (preserves original for undo)
+        orig_cat_id = originals["original_category_id"]
+        orig_cat_name = originals["original_category_name"]
+        orig_approved = originals["original_approved"]
         self._db.create_pending_change(
             transaction_id=transaction.id,
             new_category_id=category_id,
             new_category_name=category_name,
-            original_category_id=originals["original_category_id"],
-            original_category_name=originals["original_category_name"],
+            original_category_id=str(orig_cat_id) if orig_cat_id else None,
+            original_category_name=str(orig_cat_name) if orig_cat_name else None,
             change_type="category",
             new_approved=True,  # Auto-approve when categorizing
-            original_approved=originals["original_approved"],
+            original_approved=bool(orig_approved) if orig_approved is not None else None,
         )
 
         # Record in history for learning
@@ -332,15 +335,18 @@ class CategorizerService:
         split_category_name = f"[Split {len(splits)}]"
 
         # Create pending change record with split type
+        orig_cat_id = originals["original_category_id"]
+        orig_cat_name = originals["original_category_name"]
+        orig_approved = originals["original_approved"]
         self._db.create_pending_change(
             transaction_id=transaction.id,
             new_category_id=None,  # Splits don't have a single category
             new_category_name=split_category_name,
-            original_category_id=originals["original_category_id"],
-            original_category_name=originals["original_category_name"],
+            original_category_id=str(orig_cat_id) if orig_cat_id else None,
+            original_category_name=str(orig_cat_name) if orig_cat_name else None,
             change_type="split",
             new_approved=True,  # Auto-approve when splitting (same as categorize)
-            original_approved=originals["original_approved"],
+            original_approved=bool(orig_approved) if orig_approved is not None else None,
         )
 
         # Store split information in database for later push
@@ -426,15 +432,18 @@ class CategorizerService:
         originals = self._get_original_values(transaction)
 
         # Create pending change for approval only
+        orig_cat_id = originals["original_category_id"]
+        orig_cat_name = originals["original_category_name"]
+        orig_approved = originals["original_approved"]
         self._db.create_pending_change(
             transaction_id=transaction.id,
             new_category_id=transaction.category_id,  # Keep same category
             new_category_name=transaction.category_name,
-            original_category_id=originals["original_category_id"],
-            original_category_name=originals["original_category_name"],
+            original_category_id=str(orig_cat_id) if orig_cat_id else None,
+            original_category_name=str(orig_cat_name) if orig_cat_name else None,
             change_type="approve",
             new_approved=True,
-            original_approved=originals["original_approved"],
+            original_approved=bool(orig_approved) if orig_approved is not None else None,
         )
 
         # Update the transaction object for UI display

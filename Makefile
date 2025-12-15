@@ -9,8 +9,8 @@ help:
 	@echo "  make test       - Run tests"
 	@echo "  make coverage   - Run tests with coverage report"
 	@echo "  make sloc       - Count lines of code (requires scc)"
-	@echo "  make check      - Lint code"
-	@echo "  make format     - Format code"
+	@echo "  make check      - Run all checks (format, lint, typecheck)"
+	@echo "  make format     - Format code only"
 	@echo "  make mock-data  - Generate synthetic mock CSV data (deterministic)"
 	@echo "  make mock-prod-data - Export production DB to mock CSV files"
 	@echo "  make clean      - Remove cache files"
@@ -52,7 +52,9 @@ sloc-src:
 
 
 check:
-	uv run ruff check src/ tests/
+	uv run ruff format src/ tests/
+	uv run ruff check --fix src/ tests/
+	uv run mypy src/
 
 format:
 	uv run ruff format src/ tests/

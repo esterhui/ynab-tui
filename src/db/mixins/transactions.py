@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from ..models import TransactionFilter
-from .base import _date_str, _now_iso
+from .base import CountMixin, _date_str, _now_iso
 
 if TYPE_CHECKING:
     from src.models.transaction import SubTransaction, Transaction
 
 
-class TransactionMixin:
+class TransactionMixin(CountMixin):
     """Mixin for YNAB transaction database operations."""
 
     def upsert_ynab_transaction(
@@ -137,7 +137,7 @@ class TransactionMixin:
         sub: SubTransaction,
         parent_id: str,
         budget_id: Optional[str] = None,
-    ):
+    ) -> None:
         """Insert or update a subtransaction."""
         existing = conn.execute(
             "SELECT id FROM ynab_transactions WHERE id = ?", (sub.id,)
@@ -238,7 +238,7 @@ class TransactionMixin:
         since_date: Optional[datetime] = None,
         *,
         filter: Optional[TransactionFilter] = None,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Query YNAB transactions with filters.
 
         Can be called with individual parameters (backwards compatible) or
@@ -271,8 +271,8 @@ class TransactionMixin:
         else:
             category_id_filter = None
 
-        conditions = []
-        params: list = []
+        conditions: list[str] = []
+        params: list[Any] = []
 
         # Filter by budget_id if set
         budget_id = getattr(self, "budget_id", None)
@@ -340,7 +340,7 @@ class TransactionMixin:
 
             return [dict(row) for row in rows]
 
-    def get_ynab_transaction(self, transaction_id: str) -> Optional[dict]:
+    def get_ynab_transaction(self, transaction_id: str) -> Optional[dict[str, Any]]:
         """Get a single YNAB transaction by ID.
 
         Args:
@@ -365,7 +365,7 @@ class TransactionMixin:
 
             return dict(row) if row else None
 
-    def get_subtransactions(self, parent_id: str) -> list[dict]:
+    def get_subtransactions(self, parent_id: str) -> list[dict[str, Any]]:
         """Get subtransactions for a parent transaction.
 
         Args:
@@ -417,7 +417,7 @@ class TransactionMixin:
             )
             return cursor.rowcount > 0
 
-    def mark_pending_split(self, transaction_id: str, splits: list[dict]) -> bool:
+    def mark_pending_split(self, transaction_id: str, splits: list[dict[str, Any]]) -> bool:
         """Mark a transaction as pending push with split information.
 
         Args:
@@ -466,7 +466,7 @@ class TransactionMixin:
 
             return True
 
-    def get_pending_splits(self, transaction_id: str) -> list[dict]:
+    def get_pending_splits(self, transaction_id: str) -> list[dict[str, Any]]:
         """Get pending splits for a transaction.
 
         Args:
@@ -503,7 +503,7 @@ class TransactionMixin:
             )
             return cursor.rowcount > 0
 
-    def get_pending_push_transactions(self) -> list[dict]:
+    def get_pending_push_transactions(self) -> list[dict[str, Any]]:
         """Get all transactions pending push to YNAB.
 
         Returns:
@@ -605,7 +605,7 @@ class TransactionMixin:
         date: datetime,
         window_days: int = 3,
         tolerance: float = 0.10,
-    ) -> Optional[dict]:
+    ) -> Optional[dict[str, Any]]:
         """Find a YNAB transaction matching amount and date.
 
         Used for matching Amazon orders to YNAB transactions.

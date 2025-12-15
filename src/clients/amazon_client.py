@@ -76,6 +76,7 @@ class AmazonClient:
             List of Amazon orders.
         """
         self._ensure_session()
+        assert self._orders_api is not None  # Set by _ensure_session
 
         try:
             orders = self._orders_api.get_order_history(year=year, full_details=True)

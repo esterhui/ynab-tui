@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Any, Optional
 
 from ..models import AmazonOrderCache
-from .base import _date_str, _now_iso
+from .base import CountMixin, _date_str, _now_iso
 
 
-class AmazonMixin:
+class AmazonMixin(CountMixin):
     """Mixin for Amazon orders and items database operations."""
 
     def cache_amazon_order(
@@ -169,7 +169,7 @@ class AmazonMixin:
                 fetched_at=datetime.fromisoformat(order_row["fetched_at"]),
             )
 
-    def upsert_amazon_order_items(self, order_id: str, items: list[dict]) -> int:
+    def upsert_amazon_order_items(self, order_id: str, items: list[dict[str, Any]]) -> int:
         """Store Amazon order items for category matching.
 
         Args:
@@ -199,7 +199,7 @@ class AmazonMixin:
 
             return len(items)
 
-    def get_amazon_item_categories(self) -> dict[str, dict]:
+    def get_amazon_item_categories(self) -> dict[str, dict[str, Any]]:
         """Get item name to category mapping from learned data.
 
         Returns:
@@ -216,7 +216,7 @@ class AmazonMixin:
                 """
             ).fetchall()
 
-            result: dict[str, dict] = {}
+            result: dict[str, dict[str, Any]] = {}
             for row in rows:
                 name = row["item_name"]
                 if name not in result:
@@ -249,7 +249,7 @@ class AmazonMixin:
             )
             return cursor.rowcount
 
-    def get_amazon_order_items_with_prices(self, order_id: str) -> list[dict]:
+    def get_amazon_order_items_with_prices(self, order_id: str) -> list[dict[str, Any]]:
         """Get order items with prices for split transaction matching.
 
         Args:

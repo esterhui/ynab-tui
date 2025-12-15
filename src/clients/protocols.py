@@ -5,7 +5,7 @@ ensuring type safety and interface consistency.
 """
 
 from datetime import datetime
-from typing import Optional, Protocol
+from typing import Any, Optional, Protocol
 
 from ..models import (
     AmazonOrder,
@@ -69,7 +69,7 @@ class YNABClientProtocol(Protocol):
     def create_split_transaction(
         self,
         transaction_id: str,
-        splits: list[dict],
+        splits: list[dict[str, Any]],
         approve: bool = True,
     ) -> Transaction:
         """Create a split transaction."""
@@ -79,7 +79,7 @@ class YNABClientProtocol(Protocol):
         """Approve a transaction."""
         ...
 
-    def get_budgets(self) -> list[dict]:
+    def get_budgets(self) -> list[dict[str, Any]]:
         """Get available budgets."""
         ...
 
@@ -95,7 +95,7 @@ class YNABClientProtocol(Protocol):
         """Get the name of a budget by ID."""
         ...
 
-    def test_connection(self) -> dict:
+    def test_connection(self) -> dict[str, Any]:
         """Test API connection."""
         ...
 

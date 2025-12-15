@@ -45,12 +45,12 @@ class HistoryService:
         if not distribution:
             return None
 
-        total = sum(stats["count"] for stats in distribution.values())
+        total = sum(int(stats["count"]) for stats in distribution.values())
 
         # Find dominant category
-        dominant = max(distribution.items(), key=lambda x: x[1]["count"])
+        dominant = max(distribution.items(), key=lambda x: int(x[1]["count"]))
         dominant_category = dominant[0]
-        dominant_pct = dominant[1]["percentage"]
+        dominant_pct = float(dominant[1]["percentage"])
 
         return PayeePattern(
             payee_name=payee_name,

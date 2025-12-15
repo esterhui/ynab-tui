@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **IMPORTANT:** Never clear the production database unless you ask the user and get permission
 
-**IMPORTANT:** Always run "make format" before committing any work
+**IMPORTANT:** Always run "make check" before committing any work
 
 ## Project Overview
 

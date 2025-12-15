@@ -277,8 +277,10 @@ class TransactionMatcher:
         date_val = row.get("date")
         if isinstance(date_val, str):
             txn_date = datetime.strptime(date_val[:10], "%Y-%m-%d")
-        else:
+        elif isinstance(date_val, datetime):
             txn_date = date_val
+        else:
+            txn_date = datetime.now()  # Fallback, should not happen
 
         return TransactionInfo(
             transaction_id=row.get("id", ""),

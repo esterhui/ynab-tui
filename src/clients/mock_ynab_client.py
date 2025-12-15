@@ -75,7 +75,7 @@ class MockYNABClient:
                         account_name=row["account_name"] if row["account_name"] else None,
                         memo=row["memo"] if row["memo"] else None,
                         approved=row["approved"] in ("1", "true", "True"),
-                        cleared=row["cleared"] if row["cleared"] else None,
+                        cleared=row["cleared"] if row["cleared"] else "uncleared",
                         transfer_account_id=row.get("transfer_account_id") or None,
                         transfer_account_name=row.get("transfer_account_name") or None,
                         debt_transaction_type=row.get("debt_transaction_type") or None,
@@ -287,13 +287,14 @@ class MockYNABClient:
                 # Build mock subtransactions
                 subtransactions = []
                 for i, split in enumerate(splits):
+                    cat_id = split.get("category_id")
                     subtransactions.append(
                         SubTransaction(
                             id=f"{transaction_id}-split-{i}",
                             transaction_id=transaction_id,
                             amount=split["amount"],
-                            category_id=split.get("category_id"),
-                            category_name=self._get_category_name(split.get("category_id")),
+                            category_id=cat_id,
+                            category_name=self._get_category_name(cat_id) if cat_id else None,
                             memo=split.get("memo"),
                         )
                     )

@@ -10,6 +10,7 @@ from typing import Optional
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container, Horizontal
+from textual.timer import Timer
 from textual.widgets import Footer, ListItem, ListView, Static
 
 from ..models import Transaction, TransactionBatch
@@ -336,7 +337,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         self._transactions: TransactionBatch = TransactionBatch()
         self._filter_mode: str = "all"  # Current filter
         self._filter_pending: bool = False  # Waiting for filter sub-key
-        self._filter_timer: Optional[object] = None  # Timer to cancel pending state
+        self._filter_timer: Timer | None = None  # Timer to cancel pending state
         # Category and payee filters (combined with filter_mode)
         self._category_filter: Optional[CategoryFilterResult] = None
         self._payee_filter: Optional[str] = None
@@ -515,7 +516,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         )
         return Static(header, classes="transaction-header")
 
-    def action_quit(self) -> None:
+    async def action_quit(self) -> None:
         """Handle quit action."""
         self.exit()
 
@@ -1040,7 +1041,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                 return
 
             if len(budgets) == 1:
-                self.notify("Only one budget available", severity="info")
+                self.notify("Only one budget available", severity="information")
                 return
 
             modal = BudgetPickerModal(
@@ -1057,7 +1058,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             return  # Cancelled
 
         if result.budget_id == self._current_budget_id:
-            self.notify("Already on this budget", severity="info")
+            self.notify("Already on this budget", severity="information")
             return
 
         # Update state

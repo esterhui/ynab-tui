@@ -154,7 +154,7 @@ class SyncService:
 
             # Update sync state
             result.total = self._db.get_transaction_count()
-            if transactions:
+            if transactions and result.newest_date is not None:
                 self._db.update_sync_state("ynab", result.newest_date, result.total)
 
         except Exception as e:

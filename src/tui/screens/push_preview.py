@@ -283,6 +283,8 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
         if event.state == WorkerState.SUCCESS:
             self._hide_progress_bar()
             result = event.worker.result
+            if result is None:
+                return
             if result["failed"] == 0:
                 self.notify(
                     f"Pushed {result['succeeded']} changes to YNAB",
@@ -301,7 +303,7 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
             self.app.pop_screen()
 
             # Reload transactions to apply current filter (removes pushed items from view)
-            self.app.run_worker(self.app._load_transactions())
+            self.app.run_worker(self.app._load_transactions())  # type: ignore[attr-defined]
 
         elif event.state == WorkerState.ERROR:
             self._hide_progress_bar()

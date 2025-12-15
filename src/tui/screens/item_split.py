@@ -277,7 +277,7 @@ class ItemSplitScreen(Screen[bool]):
         item_price = item.get("item_price", 0) or 0
 
         # Build summary for modal header
-        current_cat = self._assignments.get(idx)
+        current_cat = self._assignments.get(idx) if idx is not None else None
         summary = TransactionSummary(
             date=self._transaction.display_date,
             payee=item_name,

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -41,7 +41,7 @@ def require_data(db: "Database", data_type: str = "transactions") -> bool:
     Returns:
         True if data exists, False otherwise (also prints message).
     """
-    count_methods = {
+    count_methods: dict[str, Any] = {
         "transactions": db.get_transaction_count,
         "orders": db.get_order_count,
     }
@@ -52,7 +52,7 @@ def require_data(db: "Database", data_type: str = "transactions") -> bool:
     return True
 
 
-def display_pending_changes(pending_changes: list[dict]) -> None:
+def display_pending_changes(pending_changes: list[dict[str, Any]]) -> None:
     """Display pending changes in standardized table format.
 
     Args:
@@ -95,19 +95,20 @@ def get_categorizer(ctx: Context) -> CategorizerService:
 
         db = Database(db_path)
 
+        ynab_client: MockYNABClient | YNABClient
         if mock:
-            ynab = MockYNABClient()
+            ynab_client = MockYNABClient()
             # Mock client needs budget_id set explicitly from config
-            ynab.set_budget_id(cfg.ynab.budget_id)
+            ynab_client.set_budget_id(cfg.ynab.budget_id)
         else:
-            ynab = YNABClient(cfg.ynab)
+            ynab_client = YNABClient(cfg.ynab)
 
         # Set budget_id on database so transactions are filtered by correct budget
-        db.budget_id = ynab.get_current_budget_id()
+        db.budget_id = ynab_client.get_current_budget_id()
 
         categorizer = CategorizerService(
             config=cfg,
-            ynab_client=ynab,
+            ynab_client=ynab_client,
             db=db,
         )
         ctx.obj["categorizer"] = categorizer
@@ -145,23 +146,24 @@ def get_sync_service(ctx: Context) -> SyncService:
         db = Database(db_path)
         ctx.obj["db"] = db
 
+        ynab_client: MockYNABClient | YNABClient
         if mock:
-            ynab = MockYNABClient()
+            ynab_client = MockYNABClient()
             # Mock client needs budget_id set explicitly from config
-            ynab.set_budget_id(cfg.ynab.budget_id)
+            ynab_client.set_budget_id(cfg.ynab.budget_id)
         else:
-            ynab = YNABClient(cfg.ynab)
+            ynab_client = YNABClient(cfg.ynab)
 
-        amazon = None
+        amazon_client: AmazonClient | MockAmazonClient | None = None
         if mock:
-            amazon = MockAmazonClient()
+            amazon_client = MockAmazonClient()
         elif cfg.amazon.username and cfg.amazon.password:
-            amazon = AmazonClient(cfg.amazon, db)
+            amazon_client = AmazonClient(cfg.amazon, db)
 
         # Set budget_id on database so transactions are stored with correct budget
-        db.budget_id = ynab.get_current_budget_id()
+        db.budget_id = ynab_client.get_current_budget_id()
 
-        ctx.obj["sync_service"] = SyncService(db=db, ynab=ynab, amazon=amazon)
+        ctx.obj["sync_service"] = SyncService(db=db, ynab=ynab_client, amazon=amazon_client)
 
         # Register cleanup callback to close database when context is torn down
         ctx.call_on_close(lambda: db.close())

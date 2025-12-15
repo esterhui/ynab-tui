@@ -5,14 +5,15 @@ from __future__ import annotations
 import json
 import sqlite3
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from src.utils.string_utils import normalize_string
 
 from ..models import CategorizationRecord
+from .base import CountMixin
 
 
-class HistoryMixin:
+class HistoryMixin(CountMixin):
     """Mixin for categorization history and item learning operations."""
 
     @staticmethod
@@ -252,7 +253,7 @@ class HistoryMixin:
                 # UNIQUE constraint violation - mapping already exists
                 return False
 
-    def get_item_category_distribution(self, item_name: str) -> dict[str, dict]:
+    def get_item_category_distribution(self, item_name: str) -> dict[str, dict[str, Any]]:
         """Get category distribution for an item.
 
         Shows how often an item has been categorized into different categories.
@@ -292,7 +293,7 @@ class HistoryMixin:
 
     def get_all_item_category_mappings(
         self, search_term: str | None = None, category_filter: str | None = None
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Get all learned item→category mappings with statistics.
 
         Args:
@@ -303,8 +304,8 @@ class HistoryMixin:
             List of dicts with item_name, categories (list of {name, count, percentage}).
         """
         with self._connection() as conn:
-            params: list = []
-            where_clauses = []
+            params: list[str] = []
+            where_clauses: list[str] = []
 
             if search_term:
                 where_clauses.append("item_name_normalized LIKE ?")

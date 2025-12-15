@@ -827,17 +827,17 @@ def undo(ctx, transaction_id, undo_all):
         click.echo(click.style(f"✓ Undone {count} change(s)", fg="green"))
     else:
         # Undo specific transaction
-        pending = db.get_pending_change(transaction_id)
-        if not pending:
+        single_pending = db.get_pending_change(transaction_id)
+        if not single_pending:
             click.echo(f"No pending change found for transaction ID: {transaction_id}")
             return
 
         # Clear any pending splits
-        if pending.get("change_type") == "split":
+        if single_pending.get("change_type") == "split":
             db.clear_pending_splits(transaction_id)
         db.delete_pending_change(transaction_id)
 
-        old_cat = pending.get("original_category_name") or "Uncategorized"
+        old_cat = single_pending.get("original_category_name") or "Uncategorized"
         click.echo(click.style(f"✓ Undone: restored to '{old_cat}'", fg="green"))
 
 

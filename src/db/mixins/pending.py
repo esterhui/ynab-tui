@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
-from .base import _now_iso
+from .base import DatabaseMixin, _now_iso
 
 
-class PendingChangesMixin:
+class PendingChangesMixin(DatabaseMixin):
     """Mixin for pending changes (undo) database operations."""
 
     def create_pending_change(
@@ -65,7 +65,7 @@ class PendingChangesMixin:
             )
             return True
 
-    def get_pending_change(self, transaction_id: str) -> Optional[dict]:
+    def get_pending_change(self, transaction_id: str) -> Optional[dict[str, Any]]:
         """Get pending change for a transaction if exists.
 
         Args:
@@ -89,15 +89,15 @@ class PendingChangesMixin:
             ).fetchone()
             return dict(row) if row else None
 
-    def get_all_pending_changes(self) -> list[dict]:
+    def get_all_pending_changes(self) -> list[dict[str, Any]]:
         """Get all pending changes with transaction details.
 
         Returns:
             List of dicts with pending change and transaction info.
         """
         budget_id = getattr(self, "budget_id", None)
-        conditions = []
-        params: list = []
+        conditions: list[str] = []
+        params: list[str] = []
 
         if budget_id:
             conditions.append("pc.budget_id = ?")

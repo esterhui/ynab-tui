@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
-from .base import _now_iso
+from .base import DatabaseMixin, _now_iso
 
 
-class CategoryMixin:
+class CategoryMixin(DatabaseMixin):
     """Mixin for YNAB category database operations."""
 
     def upsert_category(
@@ -93,7 +93,7 @@ class CategoryMixin:
                 )
                 return (True, True)
 
-    def upsert_categories(self, category_list) -> tuple[int, int]:
+    def upsert_categories(self, category_list: Any) -> tuple[int, int]:
         """Batch upsert YNAB categories from CategoryList.
 
         Args:
@@ -122,7 +122,7 @@ class CategoryMixin:
 
         return inserted, updated
 
-    def get_categories(self, include_hidden: bool = False) -> list[dict]:
+    def get_categories(self, include_hidden: bool = False) -> list[dict[str, Any]]:
         """Get all categories grouped by category group.
 
         Args:
@@ -131,8 +131,8 @@ class CategoryMixin:
         Returns:
             List of group dictionaries with nested categories.
         """
-        conditions = []
-        params: list = []
+        conditions: list[str] = []
+        params: list[str] = []
 
         if not include_hidden:
             conditions.append("hidden = 0 AND deleted = 0")
@@ -156,7 +156,7 @@ class CategoryMixin:
                 params,
             ).fetchall()
 
-            groups: dict[str, dict] = {}
+            groups: dict[str, dict[str, Any]] = {}
             for row in rows:
                 group_id = row["group_id"]
                 if group_id not in groups:
@@ -179,7 +179,7 @@ class CategoryMixin:
 
             return list(groups.values())
 
-    def get_category_by_id(self, category_id: str) -> Optional[dict]:
+    def get_category_by_id(self, category_id: str) -> Optional[dict[str, Any]]:
         """Get a category by ID.
 
         Args:
@@ -200,7 +200,7 @@ class CategoryMixin:
 
             return dict(row) if row else None
 
-    def get_category_by_name(self, name: str) -> Optional[dict]:
+    def get_category_by_name(self, name: str) -> Optional[dict[str, Any]]:
         """Get a category by name (case-insensitive).
 
         Args:

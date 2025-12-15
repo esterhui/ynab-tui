@@ -182,7 +182,7 @@ class CategoryPicker(NavigationMixin, Vertical):
                     label = f"★ {label} (AI suggested)"
 
                 item = Static(label, classes=classes)
-                item.data = cat  # Store category data
+                item.data = cat  # type: ignore[attr-defined]  # Textual widget data
                 container.mount(item)
                 flat_index += 1
 
