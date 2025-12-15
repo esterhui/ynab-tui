@@ -1,0 +1,40 @@
+# Test configuration - same structure as config.example.toml
+# Used by pytest fixtures via load_config()
+
+[ynab]
+api_token = "test-token"
+budget_id = "test-budget-id"
+timeout_seconds = 30
+max_retries = 3
+retry_base_delay = 1.0
+
+[amazon]
+username = "test@example.com"
+password = "test-password"
+otp_secret = ""
+stage1_window_days = 7
+stage2_window_days = 24
+amount_tolerance = 0.10
+recent_orders_days = 30
+earliest_history_year = 2006
+
+[categorization]
+date_match_window_days = 14
+sync_overlap_days = 7
+min_category_confidence = 0.5
+
+[payees]
+amazon_patterns = ["AMAZON", "AMZN", "Amazon.com", "AMAZON MKTPLACE"]
+
+[display]
+payee_width = 18
+amount_width = 12
+category_width = 20
+account_width = 16
+status_width = 6
+half_page_size = 10
+full_page_size = 20
+amazon_items_preview_count = 3
+item_name_truncate_length = 60
+cli_payee_width = 25
+cli_category_width = 20

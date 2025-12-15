@@ -1,0 +1,60 @@
+# YNAB TUI Configuration
+# Copy this file to ~/.config/ynab-cli/config.toml and fill in your credentials
+# Or specify a custom location with: ynab-cli --config /path/to/config.toml
+# Credentials can also be set via environment variables (see comments)
+
+[ynab]
+# Get your API token from https://app.ynab.com/settings/developer
+api_token = ""  # or use env: YNAB_API_TOKEN
+budget_id = "last-used"  # or use env: YNAB_BUDGET_ID (use "last-used" for default)
+timeout_seconds = 30
+max_retries = 3
+retry_base_delay = 1.0
+
+[amazon]
+# Amazon credentials for order history scraping
+username = ""  # or use env: AMAZON_USERNAME
+password = ""  # or use env: AMAZON_PASSWORD
+otp_secret = ""  # TOTP secret for 2FA, or use env: AMAZON_OTP_SECRET
+# Matching parameters
+stage1_window_days = 7       # Days for strict matching (first pass)
+stage2_window_days = 24      # Days for extended matching (second pass)
+amount_tolerance = 0.10      # Dollar tolerance for amount matching
+recent_orders_days = 30      # Default lookback for recent orders
+earliest_history_year = 2006 # Start year for order history
+
+[categorization]
+date_match_window_days = 14       # Days for fuzzy date matching
+sync_overlap_days = 7             # Overlap for incremental syncs
+min_category_confidence = 0.5     # Minimum confidence for category suggestions
+
+[payees]
+# Patterns to identify Amazon transactions (case-insensitive)
+amazon_patterns = [
+    "AMAZON",
+    "AMZN",
+    "Amazon.com",
+    "AMAZON MKTPLACE",
+    "AMZN MKTP",
+    "PRIME VIDEO",
+    "KINDLE",
+    "AUDIBLE",
+    "WHOLE FOODS",
+]
+
+[display]
+# TUI column widths
+payee_width = 18
+amount_width = 12
+category_width = 20
+account_width = 16
+status_width = 6
+# Pagination
+half_page_size = 10
+full_page_size = 20
+# Items display
+amazon_items_preview_count = 3
+item_name_truncate_length = 60
+# CLI formatting
+cli_payee_width = 25
+cli_category_width = 20
