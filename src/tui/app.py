@@ -487,8 +487,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
 
         # Transaction list using ListView for efficient navigation
         items = [
-            TransactionListItem(txn, self._tagged_ids)
-            for txn in self._transactions.transactions
+            TransactionListItem(txn, self._tagged_ids) for txn in self._transactions.transactions
         ]
         txn_list = ListView(*items, id="transactions-list")
 

@@ -332,9 +332,7 @@ def generate_amazon_orders() -> list[AmazonOrderInfo]:
             available_items = AMAZON_PRODUCTS[category].copy()
 
             # Mix in items from other categories for variety
-            other_category = random.choice(
-                [c for c in AMAZON_PRODUCTS.keys() if c != category]
-            )
+            other_category = random.choice([c for c in AMAZON_PRODUCTS.keys() if c != category])
             available_items.extend(random.sample(AMAZON_PRODUCTS[other_category], 2))
 
             items = random.sample(available_items, min(num_items, len(available_items)))
@@ -377,13 +375,13 @@ def generate_amazon_orders() -> list[AmazonOrderInfo]:
     # Write CSV
     csv_path = OUTPUT_DIR / "orders.csv"
     with open(csv_path, "w", newline="") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=["order_id", "order_date", "total", "items"]
-        )
+        writer = csv.DictWriter(f, fieldnames=["order_id", "order_date", "total", "items"])
         writer.writeheader()
         writer.writerows(rows)
 
-    print(f"Generated {len(rows)} Amazon orders ({sum(1 for o in orders if len(o.items) > 1)} multi-item)")
+    print(
+        f"Generated {len(rows)} Amazon orders ({sum(1 for o in orders if len(o.items) > 1)} multi-item)"
+    )
     return orders
 
 
@@ -455,7 +453,9 @@ def generate_transactions(
             category = None
             approved = amazon_txn_count >= 15  # Some uncategorized but approved
         else:
-            category = random.choice(["Electronics", "Home Goods", "Baby & Kids", "General Shopping"])
+            category = random.choice(
+                ["Electronics", "Home Goods", "Baby & Kids", "General Shopping"]
+            )
             approved = True
 
         add_transaction(
@@ -640,7 +640,9 @@ def generate_transactions(
         writer.writerows(rows)
 
     # Print summary
-    uncategorized = sum(1 for r in rows if not r["category_id"] or r["category_name"] == "Uncategorized")
+    uncategorized = sum(
+        1 for r in rows if not r["category_id"] or r["category_name"] == "Uncategorized"
+    )
     unapproved = sum(1 for r in rows if r["approved"] == "0")
     transfers = sum(1 for r in rows if r["transfer_account_id"])
     amazon = sum(1 for r in rows if "Amazon" in r["payee_name"] or "AMZN" in r["payee_name"])

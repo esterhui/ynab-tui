@@ -115,7 +115,15 @@ def ynab_categories(ctx, csv_file):
         with open(csv_file, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(
-                ["group_id", "group_name", "category_id", "budget_id", "category_name", "hidden", "deleted"]
+                [
+                    "group_id",
+                    "group_name",
+                    "category_id",
+                    "budget_id",
+                    "category_name",
+                    "hidden",
+                    "deleted",
+                ]
             )
             for group in groups:
                 for cat in group["categories"]:
@@ -402,7 +410,9 @@ def amazon_test(ctx):
 
 
 @main.command("db-amazon-orders")
-@click.option("--days", "-d", type=int, default=30, help="Query orders from last N days (default: 30)")
+@click.option(
+    "--days", "-d", type=int, default=30, help="Query orders from last N days (default: 30)"
+)
 @click.option("--year", "-y", type=int, help="Query orders for specific year")
 @click.option("--csv", "csv_file", type=click.Path(), help="Export to CSV file")
 @click.pass_context
