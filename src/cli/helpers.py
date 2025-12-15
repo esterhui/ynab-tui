@@ -113,6 +113,9 @@ def get_categorizer(ctx: Context) -> CategorizerService:
         ctx.obj["categorizer"] = categorizer
         ctx.obj["db"] = db
 
+        # Register cleanup callback to close database when context is torn down
+        ctx.call_on_close(lambda: db.close())
+
     return ctx.obj["categorizer"]
 
 
@@ -159,5 +162,8 @@ def get_sync_service(ctx: Context) -> SyncService:
         db.budget_id = ynab.get_current_budget_id()
 
         ctx.obj["sync_service"] = SyncService(db=db, ynab=ynab, amazon=amazon)
+
+        # Register cleanup callback to close database when context is torn down
+        ctx.call_on_close(lambda: db.close())
 
     return ctx.obj["sync_service"]
