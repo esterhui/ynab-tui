@@ -13,6 +13,7 @@ from src.db.database import Database
 from src.models import Transaction
 from src.services.categorizer import CategorizerService
 from src.tui.app import YNABCategorizerApp
+from src.tui.state import TagManager, TagState
 
 
 @pytest.fixture
@@ -55,19 +56,19 @@ class TestTUIFilterNavigation:
             await pilot.pause()
 
             # Initial state
-            assert tui_app._filter_mode == "all"
+            assert tui_app._filter_state.mode == "all"
 
             # Press 'f' to show filter menu, then 'u' for uncategorized
             await pilot.press("f")
             await pilot.pause()
-            assert tui_app._filter_pending is True
+            assert tui_app._filter_state.is_submenu_active is True
 
             await pilot.press("u")
             await pilot.pause()
 
             # Verify filter mode changed
-            assert tui_app._filter_mode == "uncategorized"
-            assert tui_app._filter_pending is False
+            assert tui_app._filter_state.mode == "uncategorized"
+            assert tui_app._filter_state.is_submenu_active is False
 
     async def test_filter_submenu_all_modes(self, tui_app):
         """Test all filter submenu options work."""
@@ -88,7 +89,7 @@ class TestTUIFilterNavigation:
                 await pilot.pause()
                 await pilot.press(key)
                 await pilot.pause()
-                assert tui_app._filter_mode == expected_mode
+                assert tui_app._filter_state.mode == expected_mode
 
             # Wait for all workers (filter changes trigger _load_transactions workers)
             await tui_app.workers.wait_for_complete()
@@ -193,7 +194,7 @@ class TestTUIStateChanges:
             await pilot.pause()
             await pilot.press("u")
             await pilot.pause()
-            assert tui_app._filter_mode == "uncategorized"
+            assert tui_app._filter_state.mode == "uncategorized"
 
             # Navigate around (shouldn't change filter)
             await pilot.press("j")
@@ -201,7 +202,7 @@ class TestTUIStateChanges:
             await pilot.pause()
 
             # Filter should still be uncategorized
-            assert tui_app._filter_mode == "uncategorized"
+            assert tui_app._filter_state.mode == "uncategorized"
 
     async def test_initial_transactions_loaded(self, tui_app):
         """Test transactions are loaded on mount."""
@@ -821,15 +822,6 @@ class TestTUITagging:
             await pilot.press("t")
             await pilot.pause()
 
-    async def test_tag_state_tracked(self, tui_app):
-        """Test tagged IDs set exists and can be modified."""
-        async with tui_app.run_test() as pilot:
-            await pilot.pause()
-
-            # Verify _tagged_ids attribute exists
-            assert hasattr(tui_app, "_tagged_ids")
-            assert isinstance(tui_app._tagged_ids, set)
-
 
 class TestTUISettings:
     """Test settings screen."""
@@ -983,44 +975,6 @@ class TestTUIApprove:
             await pilot.pause()
 
 
-class TestTUIFilterModals:
-    """Test filter modals."""
-
-    async def test_filter_category_sequence_doesnt_crash(self, tui_app):
-        """Test 'f' then 'c' sequence doesn't crash."""
-        async with tui_app.run_test() as pilot:
-            await pilot.pause()
-
-            # Enter filter mode
-            await pilot.press("f")
-            await pilot.pause()
-
-            # Press 'c' for category filter - no crash = success
-            await pilot.press("c")
-            await pilot.pause()
-
-            # Press escape to close any modal
-            await pilot.press("escape")
-            await pilot.pause()
-
-    async def test_filter_payee_sequence_doesnt_crash(self, tui_app):
-        """Test 'f' then 'p' sequence doesn't crash."""
-        async with tui_app.run_test() as pilot:
-            await pilot.pause()
-
-            # Enter filter mode
-            await pilot.press("f")
-            await pilot.pause()
-
-            # Press 'p' for payee filter - no crash = success
-            await pilot.press("p")
-            await pilot.pause()
-
-            # Press escape to close any modal
-            await pilot.press("escape")
-            await pilot.pause()
-
-
 class TestTUIRefresh:
     """Test refresh functionality."""
 
@@ -1045,7 +999,7 @@ class TestTUIRefresh:
             await pilot.press("u")
             await pilot.pause()
 
-            assert tui_app._filter_mode == "uncategorized"
+            assert tui_app._filter_state.mode == "uncategorized"
 
             # Refresh
             await pilot.press("r")
@@ -1053,7 +1007,7 @@ class TestTUIRefresh:
             await pilot.pause()
 
             # Filter should still be uncategorized
-            assert tui_app._filter_mode == "uncategorized"
+            assert tui_app._filter_state.mode == "uncategorized"
 
 
 class TestTUIQuit:
@@ -1078,7 +1032,7 @@ class TestTUIBulkActions:
             await pilot.pause()
 
             # Ensure no transactions are tagged
-            tui_app._tagged_ids.clear()
+            tui_app._tag_state = TagManager.clear_all(tui_app._tag_state)
 
             # Press 'A' for bulk approve - should show warning
             await pilot.press("A")
@@ -1090,7 +1044,7 @@ class TestTUIBulkActions:
             await pilot.pause()
 
             # Ensure no transactions are tagged
-            tui_app._tagged_ids.clear()
+            tui_app._tag_state = TagManager.clear_all(tui_app._tag_state)
 
             # Press 'C' for bulk categorize - should show warning
             await pilot.press("C")
@@ -1360,8 +1314,8 @@ class TestTransactionListItemDisplay:
             approved=False,
             sync_status="synced",
         )
-        tagged_ids = {"txn-tagged-001"}
-        item = TransactionListItem(txn, tagged_ids=tagged_ids)
+        tag_state = TagState(tagged_ids=frozenset({"txn-tagged-001"}))
+        item = TransactionListItem(txn, tag_state=tag_state)
         row = item._format_row()
         # Should have green star indicator
         assert "★" in row
@@ -1413,7 +1367,7 @@ class TestBulkOperations:
             await pilot.pause()
 
             # Should have 2 tagged transactions (or fewer if not enough transactions)
-            assert len(tui_app._tagged_ids) >= 0  # At least didn't crash
+            assert tui_app._tag_state.count >= 0  # At least didn't crash
 
     async def test_clear_all_tags_with_shift_t(self, tui_app):
         """Test 'T' clears all tags and shows notification."""
@@ -1431,7 +1385,7 @@ class TestBulkOperations:
             await pilot.pause()
 
             # Tags should be empty
-            assert len(tui_app._tagged_ids) == 0
+            assert tui_app._tag_state.count == 0
 
     async def test_bulk_approve_no_tags_shows_warning(self, tui_app):
         """Test 'A' with no tags shows warning."""
@@ -1439,7 +1393,7 @@ class TestBulkOperations:
             await pilot.pause()
 
             # Make sure no tags
-            tui_app._tagged_ids.clear()
+            tui_app._tag_state = TagManager.clear_all(tui_app._tag_state)
 
             # Press 'A' for bulk approve - should show warning
             await pilot.press("A")
@@ -1452,7 +1406,7 @@ class TestBulkOperations:
             await pilot.pause()
 
             # Make sure no tags
-            tui_app._tagged_ids.clear()
+            tui_app._tag_state = TagManager.clear_all(tui_app._tag_state)
 
             # Press 'C' for bulk categorize - should show warning
             await pilot.press("C")
@@ -1463,18 +1417,6 @@ class TestBulkOperations:
 class TestFilterCallbacks:
     """Tests for filter modal selection callbacks."""
 
-    async def test_filter_menu_shows_options(self, tui_app):
-        """Test 'f' shows filter menu in status bar."""
-        async with tui_app.run_test() as pilot:
-            await pilot.pause()
-
-            # Press 'f' to show filter menu
-            await pilot.press("f")
-            await pilot.pause()
-
-            # Filter pending should be True
-            assert tui_app._filter_pending is True
-
     async def test_filter_timeout_cancels(self, tui_app):
         """Test filter menu times out after delay."""
         async with tui_app.run_test() as pilot:
@@ -1483,14 +1425,14 @@ class TestFilterCallbacks:
             # Press 'f' to show filter menu
             await pilot.press("f")
             await pilot.pause()
-            assert tui_app._filter_pending is True
+            assert tui_app._filter_state.is_submenu_active is True
 
             # Press any non-filter key to cancel
             await pilot.press("escape")
             await pilot.pause()
 
             # Filter pending should be False
-            assert tui_app._filter_pending is False
+            assert tui_app._filter_state.is_submenu_active is False
 
     async def test_category_filter_modal_opens(self, tui_app):
         """Test 'f' then 'c' opens category filter modal."""
@@ -1988,74 +1930,6 @@ class TestCategorizeFlow:
             # Close any remaining dialogs
             await pilot.press("escape")
             await pilot.pause()
-
-
-class TestFilterModeQuickKeys:
-    """Tests for filter mode quick key selections."""
-
-    async def test_filter_approved_key(self, tui_app):
-        """Test 'f' then 'a' sets approved filter."""
-        async with tui_app.run_test() as pilot:
-            await pilot.pause()
-
-            # Enter filter mode
-            await pilot.press("f")
-            await pilot.pause()
-
-            # Select approved filter
-            await pilot.press("a")
-            await pilot.pause()
-
-            assert tui_app._filter_mode == "approved"
-
-    async def test_filter_new_key(self, tui_app):
-        """Test 'f' then 'n' sets new filter."""
-        async with tui_app.run_test() as pilot:
-            await pilot.pause()
-
-            # Enter filter mode
-            await pilot.press("f")
-            await pilot.pause()
-
-            # Select new filter
-            await pilot.press("n")
-            await pilot.pause()
-
-            assert tui_app._filter_mode == "new"
-
-    async def test_filter_pending_key(self, tui_app):
-        """Test 'f' then 'e' sets pending filter."""
-        async with tui_app.run_test() as pilot:
-            await pilot.pause()
-
-            # Enter filter mode
-            await pilot.press("f")
-            await pilot.pause()
-
-            # Select pending filter
-            await pilot.press("e")
-            await pilot.pause()
-
-            assert tui_app._filter_mode == "pending"
-
-    async def test_filter_all_key(self, tui_app):
-        """Test 'f' then 'x' sets all filter."""
-        async with tui_app.run_test() as pilot:
-            await pilot.pause()
-
-            # Set a filter first
-            await pilot.press("f")
-            await pilot.pause()
-            await pilot.press("a")
-            await pilot.pause()
-
-            # Now reset to all
-            await pilot.press("f")
-            await pilot.pause()
-            await pilot.press("x")
-            await pilot.pause()
-
-            assert tui_app._filter_mode == "all"
 
 
 class TestGitVersion:
