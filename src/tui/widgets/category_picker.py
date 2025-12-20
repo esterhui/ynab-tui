@@ -212,7 +212,7 @@ class CategoryPicker(NavigationMixin, Vertical):
             item = self.query_one(".category-item.--highlight")
             item.scroll_visible()
         except NoMatches:
-            pass
+            pass  # No highlighted item yet, safe to ignore
 
     def action_select_category(self) -> None:
         """Select the current category."""

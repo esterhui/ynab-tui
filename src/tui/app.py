@@ -544,7 +544,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             ):
                 txn_list.highlighted_child.update_content()
         except NoMatches:
-            pass
+            pass  # Widget not mounted yet, safe to ignore
 
     def action_clear_all_tags(self) -> None:
         """Clear all tagged transactions."""
@@ -564,7 +564,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                 if isinstance(child, TransactionListItem) and child.txn.id in ids_to_update:
                     child.update_content()
         except NoMatches:
-            pass
+            pass  # Widget not mounted yet, safe to ignore
 
         self.notify(f"Cleared {count} tag(s)", timeout=2)
 
@@ -674,7 +674,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                 if isinstance(item, TransactionListItem):
                     return item.txn
         except NoMatches:
-            pass
+            pass  # Widget not mounted yet, safe to ignore
         return None
 
     def _get_categories_for_picker(self) -> list[dict]:
@@ -721,11 +721,20 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                 return
 
             # Build transaction summary for display in modal
+            # Look up full category info to get group name
+            current_category_display = None
+            if txn.category_id:
+                cat = self._categorizer.categories.find_by_id(txn.category_id)
+                if cat:
+                    current_category_display = f"[{cat.group_name}] {cat.name}"
+                else:
+                    current_category_display = txn.category_name
+
             summary = TransactionSummary(
                 date=txn.display_date,
                 payee=txn.payee_name,
                 amount=txn.display_amount,
-                current_category=txn.category_name if txn.category_name else None,
+                current_category=current_category_display,
                 current_category_id=txn.category_id if txn.category_id else None,
                 amazon_items=txn.amazon_items if txn.is_amazon else None,
             )

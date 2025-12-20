@@ -325,7 +325,7 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
             status_bar = self.query_one("#status-bar", Static)
             status_bar.update(message)
         except NoMatches:
-            pass
+            pass  # Widget not mounted yet, safe to ignore
 
     def _update_progress(self, current: int, total: int) -> None:
         """Update the progress bar.
@@ -341,7 +341,7 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
             progress_bar = self.query_one("#progress-bar", ProgressBar)
             progress_bar.update(total=total, progress=current)
         except NoMatches:
-            pass
+            pass  # Widgets not mounted yet, safe to ignore
 
     def _show_progress_bar(self) -> None:
         """Show the progress bar container."""
@@ -349,7 +349,7 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
             container = self.query_one("#progress-container")
             container.remove_class("--hidden")
         except NoMatches:
-            pass
+            pass  # Widget not mounted yet, safe to ignore
 
     def _hide_progress_bar(self) -> None:
         """Hide the progress bar container."""
@@ -357,4 +357,4 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
             container = self.query_one("#progress-container")
             container.add_class("--hidden")
         except NoMatches:
-            pass
+            pass  # Widget not mounted yet, safe to ignore

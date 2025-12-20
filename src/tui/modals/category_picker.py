@@ -118,8 +118,33 @@ class CategoryPickerModal(FuzzySelectModal[CategorySelection]):
         name = cat["name"]
         display = f"[dim]\\[{group}][/dim] {name}" if group else name
         if self._current_category_id and cat["id"] == self._current_category_id:
-            return f"{display} [dim]← current[/dim]"
+            return f"[bold cyan]{display}[/bold cyan] [yellow]<- Current[/yellow]"
         return display
+
+    def _find_current_category_index(self) -> int:
+        """Find the index of the current category in filtered items."""
+        if not self._current_category_id:
+            return 0
+        for i, cat in enumerate(self._filtered_items):
+            if cat["id"] == self._current_category_id:
+                return i
+        return 0
+
+    def _populate_list(self) -> None:
+        """Populate list and scroll to current category."""
+        super()._populate_list()
+
+        # After populating, scroll to current category if no search query
+        query = self.query_one("#fuzzy-input", Input).value.strip()
+        if not query and self._current_category_id:
+            list_view = self.query_one("#fuzzy-list", ListView)
+            initial_index = self._find_current_category_index()
+            if initial_index < len(self._filtered_items):
+
+                def set_to_current() -> None:
+                    list_view.index = initial_index
+
+                self.call_after_refresh(set_to_current)
 
     @staticmethod
     def _search_text(cat: dict) -> str:
