@@ -58,3 +58,13 @@ item_name_truncate_length = 60
 # CLI formatting
 cli_payee_width = 25
 cli_category_width = 20
+
+# Search matching style for category/payee/transaction search modals
+# Options:
+#   "substring" - Simple substring matching (default, most intuitive)
+#                 "misc" only matches categories containing "misc"
+#   "fuzzy"     - fzf-style matching, characters must appear in order
+#                 "misc" matches "Mortgage Insurance" (m-i-s-c in order)
+#   "word_boundary" - Fuzzy match prioritizing word starts
+#                     "mr" matches "Misc Rental" better than "smirk"
+search_match_style = "substring"

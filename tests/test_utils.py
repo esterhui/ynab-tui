@@ -6,10 +6,13 @@ import pytest
 
 from src.utils import (
     fuzzy_match,
+    get_match_fn,
     is_amazon_payee,
     parse_date,
     parse_to_datetime,
+    substring_match,
     truncate_list_display,
+    word_boundary_match,
 )
 from src.utils.string_utils import normalize_string
 
@@ -124,6 +127,109 @@ class TestFuzzyMatch:
         """Test fuzzy match is case sensitive."""
         assert fuzzy_match("A", "a") is False
         assert fuzzy_match("a", "A") is False
+
+
+class TestSubstringMatch:
+    """Tests for substring_match function."""
+
+    def test_substring_match_exact(self):
+        """Test exact match returns True."""
+        assert substring_match("misc", "misc") is True
+
+    def test_substring_match_contained(self):
+        """Test substring contained in text returns True."""
+        # Note: actual usage lowercases both query and text before matching
+        assert substring_match("misc", "miscellaneous") is True
+        assert substring_match("misc", "some misc item") is True
+
+    def test_substring_match_not_contained(self):
+        """Test substring not in text returns False."""
+        assert substring_match("misc", "Groceries") is False
+        # Importantly, this should NOT match fzf-style
+        assert substring_match("misc", "Mortgage Insurance Company") is False
+
+    def test_substring_match_empty_query(self):
+        """Test empty query matches everything."""
+        assert substring_match("", "anything") is True
+
+    def test_substring_match_empty_text(self):
+        """Test empty text only matches empty query."""
+        assert substring_match("", "") is True
+        assert substring_match("a", "") is False
+
+    def test_substring_match_case_sensitive(self):
+        """Test substring match is case sensitive."""
+        assert substring_match("MISC", "misc") is False
+        assert substring_match("misc", "MISC") is False
+
+    def test_substring_match_real_world_example(self):
+        """Test real-world case: 'misc' should NOT match 'Investments Spire Stock'."""
+        # This was the original bug - fuzzy match was too permissive
+        assert substring_match("misc", "investments spire stock") is False
+        assert substring_match("misc", "credit card payments visa-chase") is False
+
+
+class TestWordBoundaryMatch:
+    """Tests for word_boundary_match function."""
+
+    def test_word_boundary_match_at_starts(self):
+        """Test matching at word boundaries."""
+        assert word_boundary_match("mr", "misc rental") is True  # M-isc R-ental
+        assert word_boundary_match("hi", "home improvement") is True  # H-ome I-mprovement
+
+    def test_word_boundary_match_exact(self):
+        """Test exact match returns True."""
+        assert word_boundary_match("misc", "misc") is True
+
+    def test_word_boundary_match_fallback_to_fuzzy(self):
+        """Test falls back to fuzzy if word boundary fails."""
+        # "gro" can match "Groceries" via fuzzy (g-r-o in order)
+        assert word_boundary_match("gro", "groceries") is True
+
+    def test_word_boundary_match_empty_query(self):
+        """Test empty query matches everything."""
+        assert word_boundary_match("", "anything") is True
+
+    def test_word_boundary_match_empty_text(self):
+        """Test empty text only matches empty query."""
+        assert word_boundary_match("", "") is True
+        assert word_boundary_match("a", "") is False
+
+    def test_word_boundary_match_no_match(self):
+        """Test no match returns False."""
+        assert word_boundary_match("xyz", "abc def") is False
+
+
+class TestGetMatchFn:
+    """Tests for get_match_fn function."""
+
+    def test_get_match_fn_substring(self):
+        """Test getting substring match function."""
+        fn = get_match_fn("substring")
+        assert fn == substring_match
+        # Note: actual usage lowercases both query and text before matching
+        assert fn("misc", "miscellaneous") is True
+        assert fn("misc", "investments spire stock") is False
+
+    def test_get_match_fn_fuzzy(self):
+        """Test getting fuzzy match function."""
+        fn = get_match_fn("fuzzy")
+        assert fn == fuzzy_match
+        # Note: actual usage lowercases both query and text before matching
+        assert fn("misc", "miscellaneous") is True
+        # fzf-style: m-i-s-c in order
+        assert fn("misc", "mortgage insurance company") is True
+
+    def test_get_match_fn_word_boundary(self):
+        """Test getting word boundary match function."""
+        fn = get_match_fn("word_boundary")
+        assert fn == word_boundary_match
+        assert fn("mr", "misc rental") is True
+
+    def test_get_match_fn_invalid_defaults_to_substring(self):
+        """Test invalid style defaults to substring."""
+        fn = get_match_fn("invalid_style")  # type: ignore[arg-type]
+        assert fn == substring_match
 
 
 class TestTruncateListDisplay:

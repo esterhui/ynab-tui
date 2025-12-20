@@ -711,7 +711,12 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                 amazon_items=None,
             )
             categories = self._get_categories_for_picker()
-            modal = CategoryPickerModal(categories=categories, transaction=summary)
+            match_style = self._categorizer._config.display.search_match_style
+            modal = CategoryPickerModal(
+                categories=categories,
+                transaction=summary,
+                match_style=match_style,
+            )
             self.push_screen(modal, self._on_bulk_category_selected)
         else:
             # Single item mode
@@ -740,7 +745,12 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             )
 
             categories = self._get_categories_for_picker()
-            modal = CategoryPickerModal(categories=categories, transaction=summary)
+            match_style = self._categorizer._config.display.search_match_style
+            modal = CategoryPickerModal(
+                categories=categories,
+                transaction=summary,
+                match_style=match_style,
+            )
             self.push_screen(modal, self._on_category_selected)
 
     def _on_category_selected(self, result: Optional[CategorySelection]) -> None:
@@ -809,7 +819,11 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         if not transactions:
             self.notify("No transactions to search", severity="warning")
             return
-        modal = TransactionSearchModal(transactions=transactions)
+        match_style = self._categorizer._config.display.search_match_style
+        modal = TransactionSearchModal(
+            transactions=transactions,
+            match_style=match_style,
+        )
         self.push_screen(modal, self._on_search_selected)
 
     def _on_search_selected(self, transaction_id: Optional[str]) -> None:
@@ -829,7 +843,11 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         if not categories:
             self.notify("No categories available", severity="warning")
             return
-        modal = CategoryFilterModal(categories=categories)
+        match_style = self._categorizer._config.display.search_match_style
+        modal = CategoryFilterModal(
+            categories=categories,
+            match_style=match_style,
+        )
         self.push_screen(modal, self._on_category_filter_selected)
 
     def _on_category_filter_selected(self, result: Optional[CategoryFilterResult]) -> None:
@@ -853,7 +871,11 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         if not payees:
             self.notify("No payees available", severity="warning")
             return
-        modal = PayeeFilterModal(payees=payees)
+        match_style = self._categorizer._config.display.search_match_style
+        modal = PayeeFilterModal(
+            payees=payees,
+            match_style=match_style,
+        )
         self.push_screen(modal, self._on_payee_filter_selected)
 
     def _on_payee_filter_selected(self, result: Optional[str]) -> None:
@@ -920,7 +942,12 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                 amazon_items=[item.get("item_name", "Unknown")],
             )
             categories = self._get_categories_for_picker()
-            modal = CategoryPickerModal(categories=categories, transaction=summary)
+            match_style = self._categorizer._config.display.search_match_style
+            modal = CategoryPickerModal(
+                categories=categories,
+                transaction=summary,
+                match_style=match_style,
+            )
             self.push_screen(modal, self._on_category_selected)
             return
 
@@ -1054,9 +1081,11 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                 self.notify("Only one budget available", severity="information")
                 return
 
+            match_style = self._categorizer._config.display.search_match_style
             modal = BudgetPickerModal(
                 budgets=budgets,
                 current_budget_id=self._current_budget_id,
+                match_style=match_style,
             )
             self.push_screen(modal, self._on_budget_selected)
         except Exception as e:

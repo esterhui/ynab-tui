@@ -76,6 +76,8 @@ class DisplayConfig:
     # CLI formatting
     cli_payee_width: int = 25
     cli_category_width: int = 20
+    # Search matching style: "substring" (default), "fuzzy" (fzf-style), "word_boundary"
+    search_match_style: str = "substring"
 
 
 @dataclass
@@ -219,6 +221,7 @@ def load_config(config_path: Optional[Path] = None) -> Config:
         item_name_truncate_length=display_data.get("item_name_truncate_length", 60),
         cli_payee_width=display_data.get("cli_payee_width", 25),
         cli_category_width=display_data.get("cli_category_width", 20),
+        search_match_style=display_data.get("search_match_style", "substring"),
     )
 
     return Config(

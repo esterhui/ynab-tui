@@ -1,4 +1,4 @@
-"""Reusable fuzzy select modal with fzf-style matching."""
+"""Reusable fuzzy select modal with configurable matching."""
 
 from typing import Any, Callable, Generic, Optional, TypeVar
 
@@ -9,7 +9,8 @@ from textual.screen import ModalScreen
 from textual.timer import Timer
 from textual.widgets import Input, ListItem, ListView, Static
 
-from ...utils import fuzzy_match
+from ...utils import get_match_fn
+from ...utils.fuzzy import MatchStyle
 
 # Type variable for the return type
 T = TypeVar("T")
@@ -95,6 +96,7 @@ class FuzzySelectModal(ModalScreen[Optional[T]], Generic[T]):
         title: str = "",
         show_all_on_empty: bool = False,
         debounce_delay: float = DEBOUNCE_DELAY,
+        match_style: MatchStyle = "substring",
         **kwargs,
     ) -> None:
         """Initialize the fuzzy select modal.
@@ -108,6 +110,7 @@ class FuzzySelectModal(ModalScreen[Optional[T]], Generic[T]):
             title: Optional title to display above the search input.
             show_all_on_empty: If True, show all items when search is empty.
             debounce_delay: Delay before searching (0 for immediate).
+            match_style: Matching algorithm - "substring", "fuzzy", or "word_boundary".
         """
         super().__init__(**kwargs)
         self._all_items = items
@@ -119,6 +122,7 @@ class FuzzySelectModal(ModalScreen[Optional[T]], Generic[T]):
         self._title = title
         self._show_all_on_empty = show_all_on_empty
         self._debounce_delay = debounce_delay
+        self._match_fn = get_match_fn(match_style)
         self._populate_generation = 0
         self._search_timer: Timer | None = None
 
@@ -180,13 +184,13 @@ class FuzzySelectModal(ModalScreen[Optional[T]], Generic[T]):
             self._do_search()
 
     def _do_search(self) -> None:
-        """Execute the fuzzy search (called after debounce delay)."""
+        """Execute the search using configured matching style."""
         query = self.query_one("#fuzzy-input", Input).value.lower().strip()
         if query:
             self._filtered_items = [
                 item
                 for item in self._all_items
-                if fuzzy_match(query, self._search_fn(item).lower())
+                if self._match_fn(query, self._search_fn(item).lower())
             ]
         else:
             self._filtered_items = self._all_items.copy() if self._show_all_on_empty else []
