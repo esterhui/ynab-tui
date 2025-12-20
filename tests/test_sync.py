@@ -162,11 +162,15 @@ class TestSyncServicePush:
         # Create a pending change in delta table
         database.create_pending_change(
             transaction_id=sample_sync_transaction.id,
-            new_category_id="cat-002",
-            new_category_name="Clothing",
-            original_category_id=sample_sync_transaction.category_id,
-            original_category_name=sample_sync_transaction.category_name,
-            change_type="category",
+            new_values={
+                "category_id": "cat-002",
+                "category_name": "Clothing",
+            },
+            original_values={
+                "category_id": sample_sync_transaction.category_id,
+                "category_name": sample_sync_transaction.category_name,
+            },
+            change_type="update",
         )
 
         # Verify it's pending
@@ -185,11 +189,15 @@ class TestSyncServicePush:
         database.upsert_ynab_transaction(sample_sync_transaction)
         database.create_pending_change(
             transaction_id=sample_sync_transaction.id,
-            new_category_id="cat-002",
-            new_category_name="Clothing",
-            original_category_id=sample_sync_transaction.category_id,
-            original_category_name=sample_sync_transaction.category_name,
-            change_type="category",
+            new_values={
+                "category_id": "cat-002",
+                "category_name": "Clothing",
+            },
+            original_values={
+                "category_id": sample_sync_transaction.category_id,
+                "category_name": sample_sync_transaction.category_name,
+            },
+            change_type="update",
         )
 
         assert database.get_pending_change_count() == 1

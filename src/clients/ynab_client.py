@@ -483,6 +483,53 @@ class YNABClient:
 
         return self._with_retry(_do_approve, "approve transaction")
 
+    def update_transaction(
+        self,
+        transaction_id: str,
+        category_id: Optional[str] = None,
+        memo: Optional[str] = None,
+        approved: Optional[bool] = None,
+    ) -> Transaction:
+        """Update a transaction with any combination of fields.
+
+        Generic update method that can modify any supported field. Only
+        non-None fields are sent to the API.
+
+        Args:
+            transaction_id: YNAB transaction ID.
+            category_id: New category ID (None = don't change).
+            memo: New memo text (None = don't change, "" = clear memo).
+            approved: New approval status (None = don't change).
+
+        Returns:
+            Updated transaction.
+        """
+        budget_id = self._get_budget_id()
+
+        def _do_update():
+            with self._get_api_client() as api_client:
+                transactions_api = ynab.TransactionsApi(api_client)
+
+                # Build ExistingTransaction with only provided fields
+                # Note: memo="" is valid (clears memo), but memo=None means don't change
+                # Pass parameters directly to avoid mypy dict unpacking issues
+                existing_txn = ynab.ExistingTransaction(
+                    category_id=category_id,
+                    memo=memo,
+                    approved=approved,
+                )
+                wrapper = ynab.PutTransactionWrapper(transaction=existing_txn)
+
+                response = transactions_api.update_transaction(
+                    budget_id,
+                    transaction_id,
+                    wrapper,
+                )
+
+                return self._convert_transaction(response.data.transaction)
+
+        return self._with_retry(_do_update, "update transaction")
+
     @_ynab_api_call("fetch budgets")
     def get_budgets(self) -> list[dict]:
         """Fetch all available budgets.

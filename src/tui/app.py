@@ -146,6 +146,8 @@ class TransactionListItem(ListItem):
             status_flags += "C"
         elif txn.cleared == "reconciled":
             status_flags += "R"
+        if txn.memo:
+            status_flags += "M"
         if txn.sync_status == "pending_push":
             status_flags += "P"
         elif txn.sync_status == "conflict":
@@ -281,6 +283,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         Binding("c", "categorize", "Categorize"),
         Binding("x", "split", "Split"),
         Binding("a", "approve", "Approve"),
+        Binding("m", "edit_memo", "Memo"),
         Binding("u", "undo", "Undo"),
         Binding("p", "push_preview", "Push"),
         # Other actions
@@ -1064,6 +1067,53 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                 # Fallback to full re-render
                 self.run_worker(self._render_transactions())
 
+    def action_edit_memo(self) -> None:
+        """Open memo edit modal for selected transaction."""
+        txn = self._get_selected_transaction()
+        if not txn:
+            self.notify("No transaction selected", severity="warning")
+            return
+
+        from .modals import MemoEditModal, MemoTransactionInfo
+
+        transaction_info = MemoTransactionInfo(
+            date=txn.display_date,
+            payee=txn.payee_name,
+            amount=txn.display_amount,
+            current_memo=txn.memo,
+        )
+
+        modal = MemoEditModal(transaction=transaction_info)
+        self.push_screen(modal, self._on_memo_edited)
+
+    def _on_memo_edited(self, result) -> None:
+        """Handle memo edit completion."""
+        if result is None or not result.changed:
+            return  # Cancelled or no change
+
+        txn = self._get_selected_transaction()
+        if not txn:
+            return
+
+        # Apply the memo change
+        self._categorizer.apply_memo(txn, result.memo)
+
+        if result.memo:
+            memo_display = result.memo[:30] + "..." if len(result.memo) > 30 else result.memo
+            self.notify(f"Memo updated: {memo_display}")
+        else:
+            self.notify("Memo cleared")
+
+        # Update the list item visually
+        try:
+            txn_list = self.query_one("#transactions-list", ListView)
+            if txn_list.highlighted_child:
+                item = txn_list.highlighted_child
+                if isinstance(item, TransactionListItem):
+                    item.update_content()
+        except Exception:
+            self.run_worker(self._render_transactions())
+
     def action_settings(self) -> None:
         """Show settings screen."""
         screen = SettingsScreen(config=self._categorizer._config)
@@ -1154,6 +1204,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
 
 [b]Categorization:[/b]
   x       Split mode (Amazon multi-item)
+  m       Edit memo
   u       Undo pending change (revert to original)
 
 [b]Other Actions:[/b]
@@ -1174,6 +1225,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
   A       Approved
   C       Cleared
   R       Reconciled
+  M       Has memo
   P       Pending push to YNAB
   !       Sync conflict
 """

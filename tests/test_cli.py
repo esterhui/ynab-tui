@@ -629,11 +629,15 @@ class TestUndoSpecificTransaction:
             # Create a pending change manually
             db.create_pending_change(
                 transaction_id=txn_id,
-                new_category_id="cat-new",
-                new_category_name="New Category",
-                original_category_id=txns[0].get("category_id"),
-                original_category_name=txns[0].get("category_name"),
-                change_type="category",
+                new_values={
+                    "category_id": "cat-new",
+                    "category_name": "New Category",
+                },
+                original_values={
+                    "category_id": txns[0].get("category_id"),
+                    "category_name": txns[0].get("category_name"),
+                },
+                change_type="update",
             )
             db.close()
 
@@ -717,11 +721,15 @@ class TestPushCommandVariants:
             # Create a pending change
             db.create_pending_change(
                 transaction_id=txn_id,
-                new_category_id="cat-new",
-                new_category_name="New Category",
-                original_category_id=txns[0].get("category_id"),
-                original_category_name=txns[0].get("category_name"),
-                change_type="category",
+                new_values={
+                    "category_id": "cat-new",
+                    "category_name": "New Category",
+                },
+                original_values={
+                    "category_id": txns[0].get("category_id"),
+                    "category_name": txns[0].get("category_name"),
+                },
+                change_type="update",
             )
         db.close()
 
@@ -751,11 +759,15 @@ class TestDBDeltasWithChanges:
             # Create a pending change
             db.create_pending_change(
                 transaction_id=txn_id,
-                new_category_id="cat-new",
-                new_category_name="New Category",
-                original_category_id=txns[0].get("category_id"),
-                original_category_name=txns[0].get("category_name"),
-                change_type="category",
+                new_values={
+                    "category_id": "cat-new",
+                    "category_name": "New Category",
+                },
+                original_values={
+                    "category_id": txns[0].get("category_id"),
+                    "category_name": txns[0].get("category_name"),
+                },
+                change_type="update",
             )
         db.close()
 

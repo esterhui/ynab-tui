@@ -270,6 +270,57 @@ class MockYNABClient:
 
         raise YNABClientError(f"Transaction {transaction_id} not found")
 
+    def update_transaction(
+        self,
+        transaction_id: str,
+        category_id: Optional[str] = None,
+        memo: Optional[str] = None,
+        approved: Optional[bool] = None,
+    ) -> Transaction:
+        """Mock generic update - stores the update without API call."""
+        # Build update dict with only provided fields
+        update = self._updated_transactions.get(transaction_id, {})
+        if category_id is not None:
+            update["category_id"] = category_id
+        if memo is not None:
+            update["memo"] = memo
+        if approved is not None:
+            update["approved"] = approved
+        self._updated_transactions[transaction_id] = update
+
+        for txn in self._transactions:
+            if txn.id == transaction_id:
+                return Transaction(
+                    id=txn.id,
+                    date=txn.date,
+                    amount=txn.amount,
+                    payee_name=txn.payee_name,
+                    payee_id=txn.payee_id,
+                    memo=memo if memo is not None else txn.memo,
+                    account_name=txn.account_name,
+                    account_id=txn.account_id,
+                    category_id=category_id if category_id is not None else txn.category_id,
+                    category_name=(
+                        self._get_category_name(category_id)
+                        if category_id is not None
+                        else txn.category_name
+                    ),
+                    approved=approved if approved is not None else txn.approved,
+                    cleared=txn.cleared,
+                )
+
+        # For testing, return a minimal transaction if not found
+        return Transaction(
+            id=transaction_id,
+            date=datetime.now(),
+            amount=0.0,
+            payee_name="Mock Update",
+            memo=memo,
+            category_id=category_id,
+            category_name=self._get_category_name(category_id) if category_id else None,
+            approved=approved if approved is not None else False,
+        )
+
     def create_split_transaction(
         self,
         transaction_id: str,

@@ -72,7 +72,9 @@ class CategorizerService:
             parts.append(f"{pct:.0f}% {cat}")
         return ", ".join(parts)
 
-    def _get_original_values(self, transaction: "Transaction") -> dict[str, str | bool | None]:
+    def _get_original_values(
+        self, transaction: "Transaction", fields: list[str] | None = None
+    ) -> dict[str, str | bool | None]:
         """Get original values for a transaction, preserving first originals if pending.
 
         When a transaction already has a pending change, we keep the very first
@@ -81,24 +83,36 @@ class CategorizerService:
 
         Args:
             transaction: The transaction to get original values for.
+            fields: Specific fields to get originals for. If None, gets all standard fields.
 
         Returns:
-            Dict with original_category_id, original_category_name, original_approved.
+            Dict with original field values (category_id, category_name, approved, memo).
         """
+        if fields is None:
+            fields = ["category_id", "category_name", "approved", "memo"]
+
         existing_pending = self._db.get_pending_change(transaction.id)
         if existing_pending:
-            # Keep the very first original values
-            return {
-                "original_category_id": existing_pending.get("original_category_id"),
-                "original_category_name": existing_pending.get("original_category_name"),
-                "original_approved": existing_pending.get("original_approved"),
-            }
+            # Keep the very first original values from the pending change's original_values
+            orig_values = existing_pending.get("original_values", {})
+            result = {}
+            for field in fields:
+                if field in orig_values:
+                    result[field] = orig_values[field]
+                # Fallback to legacy columns for backward compatibility
+                elif field == "category_id" and existing_pending.get("original_category_id"):
+                    result[field] = existing_pending["original_category_id"]
+                elif field == "category_name" and existing_pending.get("original_category_name"):
+                    result[field] = existing_pending["original_category_name"]
+                elif field == "approved" and existing_pending.get("original_approved") is not None:
+                    result[field] = existing_pending["original_approved"]
+                else:
+                    # Field not in pending change - get from transaction
+                    result[field] = getattr(transaction, field, None)
+            return result
+
         # First change - capture current values as original
-        return {
-            "original_category_id": transaction.category_id,
-            "original_category_name": transaction.category_name,
-            "original_approved": transaction.approved,
-        }
+        return {field: getattr(transaction, field, None) for field in fields}
 
     def _db_row_to_transaction(self, row: dict) -> Transaction:
         """Convert a database row to a Transaction object.
@@ -277,21 +291,20 @@ class CategorizerService:
             Updated transaction.
         """
         # Get original values (preserves first originals if already pending)
-        originals = self._get_original_values(transaction)
+        originals = self._get_original_values(
+            transaction, ["category_id", "category_name", "approved"]
+        )
 
         # Create pending change in delta table (preserves original for undo)
-        orig_cat_id = originals["original_category_id"]
-        orig_cat_name = originals["original_category_name"]
-        orig_approved = originals["original_approved"]
         self._db.create_pending_change(
             transaction_id=transaction.id,
-            new_category_id=category_id,
-            new_category_name=category_name,
-            original_category_id=str(orig_cat_id) if orig_cat_id else None,
-            original_category_name=str(orig_cat_name) if orig_cat_name else None,
-            change_type="category",
-            new_approved=True,  # Auto-approve when categorizing
-            original_approved=bool(orig_approved) if orig_approved is not None else None,
+            new_values={
+                "category_id": category_id,
+                "category_name": category_name,
+                "approved": True,  # Auto-approve when categorizing
+            },
+            original_values=originals,
+            change_type="update",
         )
 
         # Record in history for learning
@@ -329,24 +342,23 @@ class CategorizerService:
             Updated transaction marked as split and pending_push.
         """
         # Get original values (preserves first originals if already pending)
-        originals = self._get_original_values(transaction)
+        originals = self._get_original_values(
+            transaction, ["category_id", "category_name", "approved"]
+        )
 
         # Build display name showing split count
         split_category_name = f"[Split {len(splits)}]"
 
         # Create pending change record with split type
-        orig_cat_id = originals["original_category_id"]
-        orig_cat_name = originals["original_category_name"]
-        orig_approved = originals["original_approved"]
         self._db.create_pending_change(
             transaction_id=transaction.id,
-            new_category_id=None,  # Splits don't have a single category
-            new_category_name=split_category_name,
-            original_category_id=str(orig_cat_id) if orig_cat_id else None,
-            original_category_name=str(orig_cat_name) if orig_cat_name else None,
+            new_values={
+                "category_id": None,  # Splits don't have a single category
+                "category_name": split_category_name,
+                "approved": True,  # Auto-approve when splitting
+            },
+            original_values=originals,
             change_type="split",
-            new_approved=True,  # Auto-approve when splitting (same as categorize)
-            original_approved=bool(orig_approved) if orig_approved is not None else None,
         )
 
         # Store split information in database for later push
@@ -377,7 +389,7 @@ class CategorizerService:
     def undo_category(self, transaction: Transaction) -> Transaction:
         """Undo a pending category change.
 
-        Restores the transaction to its original category state by
+        Restores the transaction to its original state by
         removing the pending change from the delta table.
 
         Args:
@@ -407,6 +419,7 @@ class CategorizerService:
             transaction.category_id = original_txn.get("category_id")
             transaction.category_name = original_txn.get("category_name")
             transaction.approved = original_txn.get("approved", False)
+            transaction.memo = original_txn.get("memo")
         transaction.sync_status = "synced"
         transaction.is_split = False  # Restore non-split state
 
@@ -429,25 +442,48 @@ class CategorizerService:
             return transaction
 
         # Get original values (preserves first originals if already pending)
-        originals = self._get_original_values(transaction)
+        originals = self._get_original_values(transaction, ["approved"])
 
         # Create pending change for approval only
-        orig_cat_id = originals["original_category_id"]
-        orig_cat_name = originals["original_category_name"]
-        orig_approved = originals["original_approved"]
         self._db.create_pending_change(
             transaction_id=transaction.id,
-            new_category_id=transaction.category_id,  # Keep same category
-            new_category_name=transaction.category_name,
-            original_category_id=str(orig_cat_id) if orig_cat_id else None,
-            original_category_name=str(orig_cat_name) if orig_cat_name else None,
-            change_type="approve",
-            new_approved=True,
-            original_approved=bool(orig_approved) if orig_approved is not None else None,
+            new_values={"approved": True},
+            original_values=originals,
+            change_type="update",
         )
 
         # Update the transaction object for UI display
         transaction.approved = True
+        transaction.sync_status = "pending_push"
+
+        return transaction
+
+    def apply_memo(self, transaction: Transaction, memo: str) -> Transaction:
+        """Apply a memo to a transaction locally (marks as pending_push).
+
+        DB-first: Changes are stored in pending_changes table (delta) and
+        synced to YNAB via 'push'. Original values are preserved for undo.
+
+        Args:
+            transaction: Transaction to update.
+            memo: New memo text (can be empty string to clear memo).
+
+        Returns:
+            Updated transaction.
+        """
+        # Get original values (preserves first originals if already pending)
+        originals = self._get_original_values(transaction, ["memo"])
+
+        # Create pending change in delta table (preserves original for undo)
+        self._db.create_pending_change(
+            transaction_id=transaction.id,
+            new_values={"memo": memo},
+            original_values=originals,
+            change_type="update",
+        )
+
+        # Update the transaction object to reflect the change (for UI display)
+        transaction.memo = memo
         transaction.sync_status = "pending_push"
 
         return transaction

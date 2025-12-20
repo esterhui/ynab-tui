@@ -356,23 +356,37 @@ class SyncService:
                                 self._db.clear_pending_splits(txn_id)
                                 # Save subtransactions to database (they're in updated_txn)
                                 self._db.upsert_ynab_transaction(updated_txn)
-                    elif change_type == "approve":
-                        # Approve-only change (no category update)
-                        updated_txn = self._ynab.approve_transaction(transaction_id=txn_id)
-                        # Verify: transaction should be approved
-                        verified = updated_txn.approved is True
                     else:
-                        # Update category in YNAB (regular transaction)
-                        updated_txn = self._ynab.update_transaction_category(
+                        # Generic update - handles category, memo, approval
+                        new_values = change.get("new_values", {})
+
+                        # Fallback to legacy columns if new_values is empty
+                        if not new_values:
+                            new_values = {}
+                            if change.get("new_category_id"):
+                                new_values["category_id"] = change["new_category_id"]
+                            if change.get("new_approved") is not None:
+                                new_values["approved"] = change["new_approved"]
+
+                        # Use generic update method
+                        updated_txn = self._ynab.update_transaction(
                             transaction_id=txn_id,
-                            category_id=change["new_category_id"],
-                            approve=True,  # Auto-approve when pushing
+                            category_id=new_values.get("category_id"),
+                            memo=new_values.get("memo"),
+                            approved=new_values.get("approved", True),  # Default approve
                         )
-                        # Verify: category and approval status match what we pushed
-                        verified = (
-                            updated_txn.category_id == change["new_category_id"]
-                            and updated_txn.approved is True
-                        )
+
+                        # Verify: all pushed values match returned transaction
+                        verified = True
+                        if "category_id" in new_values and new_values["category_id"]:
+                            verified = verified and (
+                                updated_txn.category_id == new_values["category_id"]
+                            )
+                        if "memo" in new_values:
+                            # memo="" is valid (clears memo)
+                            verified = verified and (updated_txn.memo == new_values["memo"])
+                        if "approved" in new_values:
+                            verified = verified and (updated_txn.approved == new_values["approved"])
 
                     if verified:
                         # Apply change to ynab_transactions and cleanup pending_changes
@@ -422,13 +436,32 @@ class SyncService:
 
         lines = []
         for change in pending_changes:
-            old_cat = change.get("original_category_name") or "Uncategorized"
-            new_cat = change.get("new_category_name") or "Split"
+            new_values = change.get("new_values", {})
+            original_values = change.get("original_values", {})
+
+            # Category change info (fallback to legacy columns)
+            old_cat = (
+                original_values.get("category_name")
+                or change.get("original_category_name")
+                or "Uncategorized"
+            )
+            new_cat = new_values.get("category_name") or change.get("new_category_name") or "Split"
             date_str = str(change.get("date", ""))[:10]
             payee = (change.get("payee_name") or "")[:30]
             amount = change.get("amount", 0)
 
-            lines.append(f"{date_str}  {payee:<30}  {amount:>10.2f}  {old_cat} -> {new_cat}")
+            # Build change description
+            changes_desc = []
+            if new_values.get("category_id") or change.get("new_category_id"):
+                changes_desc.append(f"{old_cat} -> {new_cat}")
+            if "memo" in new_values:
+                memo_preview = (new_values["memo"] or "(cleared)")[:20]
+                changes_desc.append(f"memo: {memo_preview}")
+            if not changes_desc and new_values.get("approved"):
+                changes_desc.append("approved")
+
+            change_str = ", ".join(changes_desc) if changes_desc else "update"
+            lines.append(f"{date_str}  {payee:<30}  {amount:>10.2f}  {change_str}")
 
         return "\n".join(lines)
 

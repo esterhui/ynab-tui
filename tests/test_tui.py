@@ -241,13 +241,17 @@ class TestTUIPushPreview:
         # Create a pending change
         tui_database.create_pending_change(
             transaction_id=txn.id,
-            new_category_id="cat-002",
-            new_category_name="Groceries",
-            original_category_id=txn.category_id,
-            original_category_name=txn.category_name,
-            change_type="category",
-            new_approved=True,
-            original_approved=False,
+            new_values={
+                "category_id": "cat-002",
+                "category_name": "Groceries",
+                "approved": True,
+            },
+            original_values={
+                "category_id": txn.category_id,
+                "category_name": txn.category_name,
+                "approved": False,
+            },
+            change_type="update",
         )
 
         # Verify pending change was created

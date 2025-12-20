@@ -79,6 +79,16 @@ class YNABClientProtocol(Protocol):
         """Approve a transaction."""
         pass
 
+    def update_transaction(
+        self,
+        transaction_id: str,
+        category_id: Optional[str] = None,
+        memo: Optional[str] = None,
+        approved: Optional[bool] = None,
+    ) -> Transaction:
+        """Update a transaction with any combination of fields."""
+        pass
+
     def get_budgets(self) -> list[dict[str, Any]]:
         """Get available budgets."""
         pass

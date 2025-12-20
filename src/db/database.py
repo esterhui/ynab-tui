@@ -304,6 +304,7 @@ class Database(
             self._migrate_pending_to_delta_table(conn)
             self._migrate_add_approval_columns(conn)
             self._migrate_add_budget_id_columns(conn)
+            self._migrate_pending_changes_to_json(conn)
 
     def _migrate_add_transfer_columns(self, conn) -> None:
         """Add transfer columns to ynab_transactions if they don't exist."""
@@ -382,6 +383,63 @@ class Database(
             """CREATE INDEX IF NOT EXISTS idx_pending_splits_budget
                ON pending_splits(budget_id)"""
         )
+
+    def _migrate_pending_changes_to_json(self, conn) -> None:
+        """Add JSON columns to pending_changes for generic field updates.
+
+        This migration adds new_values and original_values JSON columns
+        to support arbitrary field changes (memo, approved, category, etc.)
+        without requiring schema changes for each new field.
+        """
+        import json
+
+        cursor = conn.execute("PRAGMA table_info(pending_changes)")
+        columns = {row[1] for row in cursor.fetchall()}
+
+        # Add JSON columns if they don't exist
+        if "new_values" not in columns:
+            conn.execute("ALTER TABLE pending_changes ADD COLUMN new_values TEXT")
+        if "original_values" not in columns:
+            conn.execute("ALTER TABLE pending_changes ADD COLUMN original_values TEXT")
+
+        # Migrate existing data from old columns to JSON format
+        # Only migrate rows that have old-style data but no JSON values
+        rows = conn.execute(
+            """
+            SELECT id, new_category_id, new_category_name, original_category_id,
+                   original_category_name, new_approved, original_approved,
+                   new_values, original_values
+            FROM pending_changes
+            WHERE new_values IS NULL AND (new_category_id IS NOT NULL OR new_approved IS NOT NULL)
+            """
+        ).fetchall()
+
+        for row in rows:
+            new_values = {}
+            original_values = {}
+
+            if row["new_category_id"] is not None:
+                new_values["category_id"] = row["new_category_id"]
+            if row["new_category_name"] is not None:
+                new_values["category_name"] = row["new_category_name"]
+            if row["new_approved"] is not None:
+                new_values["approved"] = bool(row["new_approved"])
+
+            if row["original_category_id"] is not None:
+                original_values["category_id"] = row["original_category_id"]
+            if row["original_category_name"] is not None:
+                original_values["category_name"] = row["original_category_name"]
+            if row["original_approved"] is not None:
+                original_values["approved"] = bool(row["original_approved"])
+
+            conn.execute(
+                """
+                UPDATE pending_changes
+                SET new_values = ?, original_values = ?
+                WHERE id = ?
+                """,
+                (json.dumps(new_values), json.dumps(original_values), row["id"]),
+            )
 
     def clear_all(self) -> dict[str, int]:
         """Clear all data from all tables.

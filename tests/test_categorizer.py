@@ -251,8 +251,8 @@ class TestApplyCategoryDoesNotSplit:
         # Final category should be the last one applied (in pending_changes)
         pending = database.get_pending_change(txn.id)
         assert pending is not None
-        assert pending["new_category_name"] == "Home & Garden"  # Latest wins
-        assert pending["original_category_id"] is None  # Original was uncategorized
+        assert pending["new_values"]["category_name"] == "Home & Garden"  # Latest wins
+        assert pending["original_values"]["category_id"] is None  # Original was uncategorized
 
 
 class TestApplySplitCategories:
@@ -779,8 +779,8 @@ class TestApproveTransaction:
         categorizer_service.approve_transaction(unapproved_transaction)
         pending = database.get_pending_change(unapproved_transaction.id)
         assert pending is not None
-        assert pending["change_type"] == "approve"
-        assert pending["new_approved"] == 1
+        assert pending["change_type"] == "update"
+        assert pending["new_values"]["approved"] is True
 
     def test_approve_already_approved_is_noop(self, categorizer_service, database):
         """Test that approving an already approved transaction is a no-op."""
@@ -800,6 +800,94 @@ class TestApproveTransaction:
         assert result.sync_status == "synced"
         # No pending change created
         assert database.get_pending_change(txn.id) is None
+
+
+class TestApplyMemo:
+    """Tests for apply_memo method."""
+
+    @pytest.fixture
+    def transaction_with_memo(self, database):
+        """Create a transaction with an existing memo."""
+        txn = Transaction(
+            id="txn-memo-test-001",
+            date=datetime(2024, 1, 15),
+            amount=-50.00,
+            payee_name="TEST STORE",
+            memo="Original memo",
+            sync_status="synced",
+        )
+        database.upsert_ynab_transaction(txn)
+        return txn
+
+    @pytest.fixture
+    def transaction_without_memo(self, database):
+        """Create a transaction without a memo."""
+        txn = Transaction(
+            id="txn-no-memo-001",
+            date=datetime(2024, 1, 15),
+            amount=-50.00,
+            payee_name="TEST STORE",
+            memo=None,
+            sync_status="synced",
+        )
+        database.upsert_ynab_transaction(txn)
+        return txn
+
+    def test_apply_memo_sets_memo(self, categorizer_service, transaction_without_memo):
+        """Test that apply_memo sets the memo field."""
+        result = categorizer_service.apply_memo(transaction_without_memo, "New memo text")
+        assert result.memo == "New memo text"
+
+    def test_apply_memo_marks_pending_push(self, categorizer_service, transaction_without_memo):
+        """Test that apply_memo marks transaction as pending_push."""
+        result = categorizer_service.apply_memo(transaction_without_memo, "New memo")
+        assert result.sync_status == "pending_push"
+
+    def test_apply_memo_creates_pending_change(
+        self, categorizer_service, transaction_without_memo, database
+    ):
+        """Test that apply_memo creates a pending change record."""
+        categorizer_service.apply_memo(transaction_without_memo, "New memo")
+        pending = database.get_pending_change(transaction_without_memo.id)
+        assert pending is not None
+        assert pending["new_values"]["memo"] == "New memo"
+        assert pending["original_values"]["memo"] is None
+
+    def test_apply_memo_preserves_original(
+        self, categorizer_service, transaction_with_memo, database
+    ):
+        """Test that apply_memo preserves original memo for undo."""
+        categorizer_service.apply_memo(transaction_with_memo, "Updated memo")
+        pending = database.get_pending_change(transaction_with_memo.id)
+        assert pending["original_values"]["memo"] == "Original memo"
+
+    def test_apply_memo_can_clear_memo(self, categorizer_service, transaction_with_memo):
+        """Test that empty string clears memo."""
+        result = categorizer_service.apply_memo(transaction_with_memo, "")
+        assert result.memo == ""
+
+    def test_apply_memo_combined_with_category(
+        self, categorizer_service, transaction_without_memo, database
+    ):
+        """Test that memo change can be combined with category change."""
+        # First apply category
+        categorizer_service.apply_category(transaction_without_memo, "cat-001", "Groceries")
+        # Then apply memo
+        categorizer_service.apply_memo(transaction_without_memo, "Weekly shopping")
+
+        pending = database.get_pending_change(transaction_without_memo.id)
+        # Should have both changes merged
+        assert pending["new_values"]["category_id"] == "cat-001"
+        assert pending["new_values"]["memo"] == "Weekly shopping"
+
+    def test_undo_memo_restores_original(
+        self, categorizer_service, transaction_with_memo, database
+    ):
+        """Test that undo restores original memo."""
+        categorizer_service.apply_memo(transaction_with_memo, "Changed memo")
+        categorizer_service.undo_category(transaction_with_memo)
+        assert transaction_with_memo.memo == "Original memo"
+        assert transaction_with_memo.sync_status == "synced"
 
 
 class TestGetAmazonOrderItems:
