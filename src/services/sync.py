@@ -154,20 +154,27 @@ class SyncService:
 
             # Update sync state
             result.total = self._db.get_transaction_count()
-            if transactions and result.newest_date is not None:
-                self._db.update_sync_state("ynab", result.newest_date, result.total)
+            # Always update sync state with current time (when sync actually ran)
+            if transactions or result.total > 0:
+                self._db.update_sync_state("ynab", datetime.now(), result.total)
 
         except Exception as e:
             result.errors.append(str(e))
 
         return result
 
-    def pull_amazon(self, full: bool = False, year: Optional[int] = None) -> PullResult:
+    def pull_amazon(
+        self,
+        full: bool = False,
+        year: Optional[int] = None,
+        since_days: Optional[int] = None,
+    ) -> PullResult:
         """Pull Amazon orders to local database.
 
         Args:
             full: If True, pull all orders. If False, incremental.
             year: Specific year to pull (overrides incremental logic).
+            since_days: Fetch orders from last N days (ignores sync state).
 
         Returns:
             PullResult with statistics.
@@ -186,6 +193,9 @@ class SyncService:
             elif full:
                 # Full sync - fetch all available history
                 orders = self._fetch_all_amazon_orders("Fetching Amazon orders")
+            elif since_days is not None:
+                # Explicit day range - skip sync state check
+                orders = self._amazon.get_recent_orders(days=since_days)
             else:
                 # Incremental - get recent orders
                 sync_state = self._db.get_sync_state("amazon")
@@ -230,7 +240,9 @@ class SyncService:
             if orders:
                 result.oldest_date = min(o.order_date for o in orders)
                 result.newest_date = max(o.order_date for o in orders)
-                self._db.update_sync_state("amazon", result.newest_date, result.total)
+            # Always update sync state with current time (when sync actually ran)
+            if orders or result.total > 0:
+                self._db.update_sync_state("amazon", datetime.now(), result.total)
 
         except Exception as e:
             result.errors.append(str(e))

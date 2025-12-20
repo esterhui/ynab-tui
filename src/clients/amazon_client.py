@@ -117,13 +117,6 @@ class AmazonClient:
                 for order in year_orders:
                     if start_date <= order.order_date <= end_date:
                         all_orders.append(order)
-                        # Cache the order header (items stored via upsert_amazon_order_items)
-                        if self._db:
-                            self._db.cache_amazon_order(
-                                order_id=order.order_id,
-                                order_date=order.order_date,
-                                total=order.total,
-                            )
             except AmazonClientError:
                 # Log but continue with other years
                 pass

@@ -19,7 +19,11 @@ class SyncMixin(DatabaseMixin):
 
         Returns:
             Budget-specific key like 'ynab:budget_id' or just 'ynab' if no budget.
+            Amazon is never budget-specific (same orders regardless of budget).
         """
+        # Amazon is not budget-specific - same orders regardless of YNAB budget
+        if base_key == "amazon":
+            return base_key
         budget_id = getattr(self, "budget_id", None)
         if budget_id:
             return f"{base_key}:{budget_id}"

@@ -610,8 +610,13 @@ def amazon_match(ctx, verbose):
 @click.option("--ynab-only", is_flag=True, help="Only pull YNAB transactions")
 @click.option("--amazon-only", is_flag=True, help="Only pull Amazon orders")
 @click.option("--amazon-year", type=int, help="Specific year for Amazon orders")
+@click.option(
+    "--since-days",
+    type=int,
+    help="Only fetch Amazon orders from the last N days (ignores sync state)",
+)
 @click.pass_context
-def pull(ctx, full, ynab_only, amazon_only, amazon_year):
+def pull(ctx, full, ynab_only, amazon_only, amazon_year, since_days):
     """Pull data from YNAB and Amazon to local database.
 
     Downloads categories, transactions and orders to local SQLite for offline
@@ -698,10 +703,24 @@ def pull(ctx, full, ynab_only, amazon_only, amazon_year):
     if not ynab_only:
         click.echo("\nPulling Amazon orders...")
         amazon_state = sync_service._db.get_sync_state("amazon")
-        if amazon_state and amazon_state.get("last_sync_at") and not full and not amazon_year:
-            click.echo(f"  Last sync: {amazon_state['last_sync_at'].strftime('%Y-%m-%d %H:%M')}")
+        if amazon_year:
+            click.echo(f"  Fetching year: {amazon_year}")
+        elif since_days:
+            click.echo(f"  Fetching last {since_days} days")
+        elif full:
+            click.echo("  Full sync requested")
+        elif amazon_state and amazon_state.get("last_sync_at"):
+            from datetime import datetime as dt
+            from datetime import timedelta
 
-        result = sync_service.pull_amazon(full=full, year=amazon_year)
+            click.echo(f"  Last sync: {amazon_state['last_sync_at'].strftime('%Y-%m-%d %H:%M')}")
+            days_since = (dt.now() - amazon_state["last_sync_date"]).days + sync_overlap_days
+            since_date = dt.now() - timedelta(days=days_since)
+            click.echo(f"  Fetching since: {since_date.strftime('%Y-%m-%d')}")
+        else:
+            click.echo("  First sync - fetching all orders")
+
+        result = sync_service.pull_amazon(full=full, year=amazon_year, since_days=since_days)
         results["amazon"] = result
 
         if result.success:

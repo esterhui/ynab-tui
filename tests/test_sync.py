@@ -260,3 +260,96 @@ class TestSyncServiceInit:
 
         config = CategorizationConfig()
         assert config.sync_overlap_days == 7
+
+
+class TestSyncStateUpdates:
+    """Tests for sync state updates - should always update when DB has data."""
+
+    def test_ynab_sync_state_updated_when_no_new_transactions(self, sync_service, database):
+        """Sync state updates even when incremental pull returns no new transactions."""
+        # First pull to populate DB
+        sync_service.pull_ynab()
+        initial_count = database.get_transaction_count()
+        assert initial_count > 0
+
+        # Get initial sync state
+        state1 = database.get_sync_state("ynab")
+        assert state1 is not None
+
+        # Second pull (should return no new transactions since data hasn't changed)
+        sync_service.pull_ynab()
+
+        # Sync state should still be present
+        state2 = database.get_sync_state("ynab")
+        assert state2 is not None
+        assert state2["record_count"] == initial_count
+
+    def test_amazon_sync_state_updated_when_no_new_orders(self, sync_service, database):
+        """Sync state updates even when incremental pull returns no new orders."""
+        # First pull to populate DB
+        sync_service.pull_amazon()
+        initial_count = database.get_order_count()
+        assert initial_count > 0
+
+        # Get initial sync state
+        state1 = database.get_sync_state("amazon")
+        assert state1 is not None
+
+        # Second pull (should return no new orders since data hasn't changed)
+        sync_service.pull_amazon()
+
+        # Sync state should still be present
+        state2 = database.get_sync_state("amazon")
+        assert state2 is not None
+        assert state2["record_count"] == initial_count
+
+    def test_amazon_pull_with_since_days(self, sync_service, database):
+        """Test --since-days option fetches orders ignoring sync state."""
+        # Pull with explicit since_days
+        result = sync_service.pull_amazon(since_days=30)
+
+        assert result.success
+        # Sync state should be updated
+        state = database.get_sync_state("amazon")
+        if result.fetched > 0:
+            assert state is not None
+
+    def test_amazon_pull_counts_inserted_correctly(self, sync_service, database):
+        """Test that inserted count matches actual new orders added."""
+        # First pull - should insert all orders
+        result = sync_service.pull_amazon()
+
+        assert result.success
+        assert result.fetched > 0
+        # All fetched orders should be inserted on first pull
+        assert result.inserted == result.fetched
+        assert result.updated == 0
+        assert database.get_order_count() == result.inserted
+
+    def test_amazon_pull_counts_updated_on_second_pull(self, sync_service, database):
+        """Test that second pull shows no new inserts (orders already exist)."""
+        # First pull
+        sync_service.pull_amazon()
+        initial_count = database.get_order_count()
+
+        # Second pull - same orders, no new inserts
+        result2 = sync_service.pull_amazon()
+
+        assert result2.success
+        assert result2.inserted == 0  # No new orders
+        assert database.get_order_count() == initial_count  # Same count
+
+    def test_sync_state_uses_current_datetime(self, sync_service, database):
+        """Test that sync state last_sync_at is approximately now, not order date."""
+        from datetime import datetime, timedelta
+
+        before_sync = datetime.now()
+        sync_service.pull_amazon()
+        after_sync = datetime.now()
+
+        state = database.get_sync_state("amazon")
+        assert state is not None
+
+        # last_sync_at should be between before and after sync times
+        assert state["last_sync_at"] >= before_sync - timedelta(seconds=1)
+        assert state["last_sync_at"] <= after_sync + timedelta(seconds=1)
