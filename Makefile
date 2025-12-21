@@ -1,4 +1,4 @@
-.PHONY: help install run test coverage sloc check format mock-data mock-prod-data clean pull pull-full push push-dry db-status
+.PHONY: help install run test coverage sloc check format mock-data mock-prod-data clean pull pull-full push push-dry db-status build version-check release release-prep
 
 help:
 	@echo "YNAB TUI"
@@ -31,6 +31,16 @@ help:
 	@echo "Mock mode (no live APIs):"
 	@echo "  uv run python -m src.main --mock              # Launch TUI with mock data"
 	@echo "  uv run python -m src.main --mock db-clear     # Only clears mock DB"
+	@echo ""
+	@echo "Release commands:"
+	@echo "  make build         - Build package (sdist + wheel)"
+	@echo "  make version-check - Verify version consistency"
+	@echo "  make release       - Full release: check, test, build"
+	@echo ""
+	@echo "Release script (preferred):"
+	@echo "  ./scripts/release.py 0.2.0           # Prepare release 0.2.0"
+	@echo "  ./scripts/release.py 0.2.0 --dry-run # Preview changes"
+	@echo "  See RELEASING.md for full documentation"
 
 install:
 	uv sync --all-extras
@@ -93,3 +103,30 @@ push-dry:
 
 db-status:
 	uv run python -m src.main db-status
+
+# Release commands
+build:
+	uv build
+
+version-check:
+	@echo "Checking version consistency..."
+	@PYPROJECT_VERSION=$$(grep '^version = ' pyproject.toml | cut -d'"' -f2) && \
+	INIT_VERSION=$$(grep '__version__' src/__init__.py | cut -d'"' -f2) && \
+	if [ "$$PYPROJECT_VERSION" != "$$INIT_VERSION" ]; then \
+		echo "ERROR: Version mismatch!"; \
+		echo "  pyproject.toml: $$PYPROJECT_VERSION"; \
+		echo "  src/__init__.py: $$INIT_VERSION"; \
+		exit 1; \
+	else \
+		echo "Version $$PYPROJECT_VERSION OK"; \
+	fi
+
+release: version-check check test build
+	@echo ""
+	@echo "Build complete! Next steps:"
+	@echo "  1. Create git tag: git tag v$$(grep '^version = ' pyproject.toml | cut -d'\"' -f2)"
+	@echo "  2. Push tag: git push origin --tags"
+	@echo "  3. Go to GitHub Actions and trigger 'Publish to PyPI' workflow"
+	@echo ""
+	@echo "Built artifacts in dist/:"
+	@ls -la dist/

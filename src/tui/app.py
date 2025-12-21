@@ -3,7 +3,6 @@
 Built with Textual for a modern terminal UI experience.
 """
 
-import subprocess
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -14,6 +13,7 @@ from textual.css.query import NoMatches
 from textual.timer import Timer
 from textual.widgets import Footer, ListItem, ListView, Static
 
+from .. import __version__
 from ..models import Transaction, TransactionBatch
 from ..services import CategorizerService
 from .constants import VIM_NAVIGATION_BINDINGS
@@ -39,21 +39,6 @@ from .state import (
     TagManager,
     TagState,
 )
-
-
-def _get_git_version() -> str:
-    """Get short git hash if in a git repo."""
-    try:
-        return (
-            subprocess.check_output(
-                ["git", "rev-parse", "--short", "HEAD"],
-                stderr=subprocess.DEVNULL,
-            )
-            .decode()
-            .strip()
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return "unknown"
 
 
 def _format_sync_time(timestamp: Optional[datetime]) -> str:
@@ -346,7 +331,6 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         self._action_handler = ActionHandler(categorizer)
         self._is_mock = is_mock
         self._load_since_months = load_since_months
-        self._git_version = _get_git_version()
         self._transactions: TransactionBatch = TransactionBatch()
         # Filter state (immutable - replaced on changes)
         self._filter_state = FilterState()
@@ -368,7 +352,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         """Build the header text with program name, version, mode, and budget."""
         mode_indicator = "[yellow][MOCK][/yellow]" if self._is_mock else "[green][PROD][/green]"
         budget_name = self._current_budget_name or "Loading..."
-        return f"YNAB TUI v{self._git_version} {mode_indicator} | [cyan]{budget_name}[/cyan]"
+        return f"YNAB TUI v{__version__} {mode_indicator} | [cyan]{budget_name}[/cyan]"
 
     def _update_header(self) -> None:
         """Update the header text with current budget name."""

@@ -1,0 +1,72 @@
+name: Publish to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 0.1.0)'
+        required: true
+        type: string
+
+jobs:
+  validate:
+    name: Validate version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check version matches
+        run: |
+          PYPROJECT_VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+          INIT_VERSION=$(grep '__version__' src/__init__.py | cut -d'"' -f2)
+          INPUT_VERSION="${{ inputs.version }}"
+
+          if [ "$PYPROJECT_VERSION" != "$INPUT_VERSION" ]; then
+            echo "Error: pyproject.toml version ($PYPROJECT_VERSION) != input ($INPUT_VERSION)"
+            exit 1
+          fi
+          if [ "$INIT_VERSION" != "$INPUT_VERSION" ]; then
+            echo "Error: __init__.py version ($INIT_VERSION) != input ($INPUT_VERSION)"
+            exit 1
+          fi
+          echo "Version $INPUT_VERSION validated successfully"
+
+  test:
+    name: Run tests
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv sync --all-extras
+      - run: uv run pytest tests/ -n auto
+
+  build:
+    name: Build package
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+      - run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # For trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

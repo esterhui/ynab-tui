@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/esterhui/ynab-tui/actions/workflows/ci.yml/badge.svg)](https://github.com/esterhui/ynab-tui/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/esterhui/ynab-tui/graph/badge.svg)](https://codecov.io/gh/esterhui/ynab-tui)
+[![PyPI](https://img.shields.io/pypi/v/ynab-tui)](https://pypi.org/project/ynab-tui/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -26,8 +27,18 @@ A terminal user interface for categorizing YNAB (You Need A Budget) transactions
 
 ## Installation
 
+### From PyPI (Recommended)
+
 ```bash
-# Clone and install
+pip install ynab-tui
+
+# Or with uv
+uv pip install ynab-tui
+```
+
+### From Source
+
+```bash
 git clone https://github.com/esterhui/ynab-tui.git
 cd ynab-tui
 uv sync --all-extras
@@ -59,10 +70,13 @@ export AMAZON_PASSWORD="your-password"
 
 ```bash
 # Launch the TUI
-uv run python -m src.main
+ynab-tui
 
 # Or use mock mode (no credentials needed)
-uv run python -m src.main --mock
+ynab-tui --mock
+
+# Show version
+ynab-tui --version
 ```
 
 **Vim-style keybindings:**
@@ -87,26 +101,26 @@ uv run python -m src.main --mock
 
 ```bash
 # Sync commands (git-style pull/push)
-uv run python -m src.main pull              # Pull YNAB + Amazon data to local DB
-uv run python -m src.main pull --full       # Full pull of all data
-uv run python -m src.main push              # Push local categorizations to YNAB
-uv run python -m src.main push --dry-run    # Preview what would be pushed
+ynab-tui pull              # Pull YNAB + Amazon data to local DB
+ynab-tui pull --full       # Full pull of all data
+ynab-tui push              # Push local categorizations to YNAB
+ynab-tui push --dry-run    # Preview what would be pushed
 
 # List uncategorized transactions
-uv run python -m src.main uncategorized
+ynab-tui uncategorized
 
 # Database inspection
-uv run python -m src.main db-status         # Show sync status and statistics
-uv run python -m src.main db-deltas         # Show pending changes before push
-uv run python -m src.main ynab-budgets      # List available budgets
+ynab-tui db-status         # Show sync status and statistics
+ynab-tui db-deltas         # Show pending changes before push
+ynab-tui ynab-budgets      # List available budgets
 
 # Category mappings (learn from history)
-uv run python -m src.main mappings          # Query learned item->category mappings
-uv run python -m src.main mappings-create   # Build mappings from approved transactions
+ynab-tui mappings          # Query learned item->category mappings
+ynab-tui mappings-create   # Build mappings from approved transactions
 
 # Test connections
-uv run python -m src.main ynab-test
-uv run python -m src.main amazon-test
+ynab-tui ynab-test
+ynab-tui amazon-test
 ```
 
 ### Makefile
@@ -159,25 +173,25 @@ Mock mode (no live APIs):
 **First time setup:**
 ```bash
 # Do a full pull to download all YNAB transactions and Amazon order history
-uv run python -m src.main pull --full
+ynab-tui pull --full
 ```
 
 **Ongoing usage:**
 ```bash
 # 1. Pull new transactions (incremental - only fetches recent changes)
-uv run python -m src.main pull
+ynab-tui pull
 
 # 2. Launch the TUI to review and categorize
-uv run python -m src.main
+ynab-tui
 
 # 3. In the TUI: navigate with j/k, categorize with 'c', approve with 'a'
 #    For Amazon orders, use 'x' to split into individual items
 
 # 4. Push your changes back to YNAB (from CLI or use 'P' in TUI)
-uv run python -m src.main push
+ynab-tui push
 
 # Optional: preview changes before pushing
-uv run python -m src.main push --dry-run
+ynab-tui push --dry-run
 ```
 
 ### Amazon Order Matching
@@ -206,7 +220,13 @@ uv run ruff check src/ tests/
 uv run ruff format src/ tests/
 
 # Run with mock data (no credentials needed)
-uv run python -m src.main --mock
+ynab-tui --mock
+
+# Build package
+make build
+
+# Full release check (lint, test, build)
+make release
 ```
 
 ## License

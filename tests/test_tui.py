@@ -1932,16 +1932,17 @@ class TestCategorizeFlow:
             await pilot.pause()
 
 
-class TestGitVersion:
-    """Tests for git version utility."""
+class TestVersionAndFormatting:
+    """Tests for version and formatting utilities."""
 
-    def test_get_git_version_returns_string(self):
-        """Test _get_git_version returns a string."""
-        from src.tui.app import _get_git_version
+    def test_version_available(self):
+        """Test __version__ is available from package."""
+        from src import __version__
 
-        version = _get_git_version()
-        assert isinstance(version, str)
-        assert len(version) > 0  # Either git hash or "unknown"
+        assert isinstance(__version__, str)
+        assert len(__version__) > 0
+        # Should be semantic version format
+        assert "." in __version__
 
     def test_format_sync_time_none(self):
         """Test _format_sync_time handles None."""

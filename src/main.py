@@ -5,6 +5,7 @@ Provides both TUI and CLI interfaces for transaction categorization.
 
 import click
 
+from . import __version__
 from .cli import (
     display_amazon_match_results,
     display_pending_changes,
@@ -20,6 +21,7 @@ from .utils import is_amazon_payee
 
 
 @click.group(invoke_without_command=True)
+@click.version_option(version=__version__, prog_name="ynab-tui")
 @click.option("--config", "-c", type=click.Path(exists=True), help="Path to config.toml")
 @click.option("--budget", "-b", type=str, help="Budget name to use (default: last-used)")
 @click.option("--mock", is_flag=True, help="Use mock mode (mock DB, YNAB, Amazon clients)")
