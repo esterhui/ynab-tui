@@ -634,3 +634,286 @@ class TestGetUniquePayees:
 
         payees = get_unique_payees([])
         assert len(payees) == 0
+
+
+# =============================================================================
+# MemoEditModal Tests
+# =============================================================================
+
+
+class TestMemoEditResult:
+    """Tests for MemoEditResult dataclass."""
+
+    def test_memo_edit_result_creation(self):
+        """Test creating a MemoEditResult."""
+        from src.tui.modals.memo_edit import MemoEditResult
+
+        result = MemoEditResult(memo="Test memo", changed=True)
+        assert result.memo == "Test memo"
+        assert result.changed is True
+
+    def test_memo_edit_result_unchanged(self):
+        """Test MemoEditResult with no change."""
+        from src.tui.modals.memo_edit import MemoEditResult
+
+        result = MemoEditResult(memo="Same memo", changed=False)
+        assert result.memo == "Same memo"
+        assert result.changed is False
+
+
+class TestTransactionInfo:
+    """Tests for TransactionInfo dataclass."""
+
+    def test_transaction_info_creation(self):
+        """Test creating TransactionInfo."""
+        from src.tui.modals.memo_edit import TransactionInfo
+
+        info = TransactionInfo(
+            date="2024-01-15",
+            payee="Test Store",
+            amount="-$50.00",
+        )
+        assert info.date == "2024-01-15"
+        assert info.payee == "Test Store"
+        assert info.amount == "-$50.00"
+        assert info.current_memo is None
+
+    def test_transaction_info_with_memo(self):
+        """Test TransactionInfo with memo."""
+        from src.tui.modals.memo_edit import TransactionInfo
+
+        info = TransactionInfo(
+            date="2024-01-15",
+            payee="Test Store",
+            amount="-$50.00",
+            current_memo="Existing memo",
+        )
+        assert info.current_memo == "Existing memo"
+
+
+class TestMemoEditModal:
+    """Tests for MemoEditModal."""
+
+    @pytest.fixture
+    def sample_transaction_info(self):
+        """Sample transaction info for testing."""
+        from src.tui.modals.memo_edit import TransactionInfo
+
+        return TransactionInfo(
+            date="2024-01-15",
+            payee="Test Store",
+            amount="-$50.00",
+            current_memo="Original memo",
+        )
+
+    @pytest.fixture
+    def transaction_info_no_memo(self):
+        """Transaction info with no memo."""
+        from src.tui.modals.memo_edit import TransactionInfo
+
+        return TransactionInfo(
+            date="2024-01-15",
+            payee="Test Store",
+            amount="-$50.00",
+        )
+
+    async def test_modal_opens_without_crash(self, sample_transaction_info):
+        """Test modal opens successfully."""
+        from src.tui.modals.memo_edit import MemoEditModal
+
+        modal = MemoEditModal(transaction=sample_transaction_info)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Modal should be visible
+            assert len(app.screen_stack) >= 1
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_modal_displays_transaction_info(self, sample_transaction_info):
+        """Test modal shows transaction payee and amount."""
+        from src.tui.modals.memo_edit import MemoEditModal
+
+        modal = MemoEditModal(transaction=sample_transaction_info)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Check that transaction info is in the screen (modal is visible)
+            assert modal._transaction.payee == "Test Store"
+            assert modal._transaction.amount == "-$50.00"
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_modal_displays_current_memo(self, sample_transaction_info):
+        """Test modal shows current memo."""
+        from src.tui.modals.memo_edit import MemoEditModal
+
+        modal = MemoEditModal(transaction=sample_transaction_info)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Check original memo is stored
+            assert modal._original_memo == "Original memo"
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_modal_displays_no_memo_message(self, transaction_info_no_memo):
+        """Test modal shows 'No memo set' when no memo exists."""
+        from src.tui.modals.memo_edit import MemoEditModal
+
+        modal = MemoEditModal(transaction=transaction_info_no_memo)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Original memo should be empty string
+            assert modal._original_memo == ""
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_cancel_returns_none(self, sample_transaction_info):
+        """Test escape cancels and returns None."""
+        from src.tui.modals.memo_edit import MemoEditModal
+
+        modal = MemoEditModal(transaction=sample_transaction_info)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("escape")
+            await pilot.pause()
+
+        assert app._result is None
+
+    async def test_save_returns_memo_result(self, sample_transaction_info):
+        """Test enter saves and returns MemoEditResult."""
+        from src.tui.modals.memo_edit import MemoEditModal
+
+        modal = MemoEditModal(transaction=sample_transaction_info)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Press enter to save (without changing memo)
+            await pilot.press("enter")
+            await pilot.pause()
+
+        # Should return result (not None)
+        assert app._result is not None
+        assert app._result.memo == "Original memo"
+        assert app._result.changed is False
+
+    async def test_save_detects_changed_memo(self, sample_transaction_info):
+        """Test save detects when memo was changed."""
+        from textual.widgets import Input
+
+        from src.tui.modals.memo_edit import MemoEditModal
+
+        modal = MemoEditModal(transaction=sample_transaction_info)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Directly set the input value (simulating user typing)
+            input_widget = modal.query_one("#memo-input", Input)
+            input_widget.value = "New memo text"
+            await pilot.pause()
+            # Save
+            await pilot.press("enter")
+            await pilot.pause()
+
+        assert app._result is not None
+        assert app._result.memo == "New memo text"
+        assert app._result.changed is True
+
+    async def test_save_unchanged_memo(self, transaction_info_no_memo):
+        """Test save with unchanged empty memo."""
+        from src.tui.modals.memo_edit import MemoEditModal
+
+        modal = MemoEditModal(transaction=transaction_info_no_memo)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Just press enter without typing
+            await pilot.press("enter")
+            await pilot.pause()
+
+        assert app._result is not None
+        assert app._result.memo == ""
+        assert app._result.changed is False
+
+    async def test_input_focus_on_mount(self, sample_transaction_info):
+        """Test input is focused when modal opens."""
+        from textual.widgets import Input
+
+        from src.tui.modals.memo_edit import MemoEditModal
+
+        modal = MemoEditModal(transaction=sample_transaction_info)
+        app = ModalTestApp(modal)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Check that input has focus
+            focused = modal.focused
+            assert isinstance(focused, Input)
+            await pilot.press("escape")
+            await pilot.pause()
+
+
+# =============================================================================
+# CategoryFilterModal Extended Tests
+# =============================================================================
+
+
+class TestCategoryFilterModalExtended:
+    """Extended tests for CategoryFilterModal static methods."""
+
+    @pytest.fixture
+    def filter_categories(self):
+        """Sample categories for filter testing."""
+        return [
+            {"id": "cat-1", "name": "Groceries", "group_name": "Food"},
+            {"id": "cat-2", "name": "Restaurants", "group_name": "Food"},
+            {"id": "cat-3", "name": "Gas", "group_name": "Transport"},
+            {"id": "cat-4", "name": "Electric", "group_name": "Bills"},
+        ]
+
+    def test_format_category_with_group(self, filter_categories):
+        """Test _format_category includes group name."""
+        from src.tui.modals.category_filter import CategoryFilterModal
+
+        result = CategoryFilterModal._format_category(filter_categories[0])
+        assert "Groceries" in result
+        assert "Food" in result
+
+    def test_format_category_without_group(self):
+        """Test _format_category without group name."""
+        from src.tui.modals.category_filter import CategoryFilterModal
+
+        cat = {"id": "cat-1", "name": "Misc"}
+        result = CategoryFilterModal._format_category(cat)
+        assert result == "Misc"
+
+    def test_search_text(self, filter_categories):
+        """Test _search_text extracts searchable text."""
+        from src.tui.modals.category_filter import CategoryFilterModal
+
+        result = CategoryFilterModal._search_text(filter_categories[0])
+        assert "Food" in result
+        assert "Groceries" in result
+
+    def test_make_result(self, filter_categories):
+        """Test _make_result creates CategoryFilterResult."""
+        from src.tui.modals.category_filter import (
+            CategoryFilterModal,
+            CategoryFilterResult,
+        )
+
+        result = CategoryFilterModal._make_result(filter_categories[0])
+        assert isinstance(result, CategoryFilterResult)
+        assert result.category_id == "cat-1"
+        assert result.category_name == "Groceries"

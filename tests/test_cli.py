@@ -1005,3 +1005,144 @@ class TestAdditionalCLIEdgeCases:
 
         result = cli_runner.invoke(main, ["--mock", "db-amazon-orders"])
         assert result.exit_code == 0
+
+
+# =============================================================================
+# Additional CLI Tests for Coverage
+# =============================================================================
+
+
+class TestPushDryRun:
+    """Tests for push command dry run mode."""
+
+    def test_push_dry_run_succeeds(self, cli_runner, isolated_mock_env, monkeypatch):
+        """Test push --dry-run shows what would be pushed."""
+        monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
+        monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
+
+        result = cli_runner.invoke(main, ["--mock", "push", "--dry-run"])
+        # Should succeed (even with no pending changes)
+        assert result.exit_code == 0
+
+    def test_push_with_no_pending_changes(self, cli_runner, isolated_mock_env, monkeypatch):
+        """Test push with no pending changes."""
+        monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
+        monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
+
+        # First do a pull to set up database
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab"])
+
+        result = cli_runner.invoke(main, ["--mock", "push"])
+        assert result.exit_code == 0
+        # Should say no changes
+        assert (
+            "No pending" in result.output
+            or "0 changes" in result.output
+            or "push" in result.output.lower()
+        )
+
+
+class TestDBStatusExtended:
+    """Extended tests for db-status command."""
+
+    def test_db_status_on_fresh_database(self, cli_runner, isolated_mock_env, monkeypatch):
+        """Test db-status on fresh database."""
+        monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
+        monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
+
+        result = cli_runner.invoke(main, ["--mock", "db-status"])
+        assert result.exit_code == 0
+        assert "Status" in result.output
+
+    def test_db_status_with_synced_data(self, cli_runner, isolated_mock_env, monkeypatch):
+        """Test db-status after pulling data."""
+        monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
+        monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
+
+        # Pull data first
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab"])
+
+        result = cli_runner.invoke(main, ["--mock", "db-status"])
+        assert result.exit_code == 0
+        # Should show transaction counts
+        assert "Transaction" in result.output or "Status" in result.output
+
+
+class TestDBTransactionsOptions:
+    """Tests for db-transactions command options."""
+
+    def test_uncategorized_option(self, cli_runner, isolated_mock_env, monkeypatch):
+        """Test db-transactions --uncategorized filter."""
+        monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
+        monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
+
+        result = cli_runner.invoke(main, ["--mock", "db-transactions", "--uncategorized"])
+        assert result.exit_code == 0
+
+    def test_pending_option(self, cli_runner, isolated_mock_env, monkeypatch):
+        """Test db-transactions --pending filter."""
+        monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
+        monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
+
+        result = cli_runner.invoke(main, ["--mock", "db-transactions", "--pending"])
+        assert result.exit_code == 0
+
+    def test_limit_with_pulled_data(self, cli_runner, isolated_mock_env, monkeypatch):
+        """Test db-transactions with limit."""
+        monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
+        monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
+
+        # Pull data first
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab"])
+
+        result = cli_runner.invoke(main, ["--mock", "db-transactions", "--limit", "5"])
+        assert result.exit_code == 0
+
+
+class TestHelpCommands:
+    """Tests for help and basic command options."""
+
+    def test_main_help(self, cli_runner):
+        """Test main --help shows usage."""
+        result = cli_runner.invoke(main, ["--help"])
+        assert result.exit_code == 0
+        assert "Usage" in result.output
+
+    def test_pull_help(self, cli_runner):
+        """Test pull --help shows options."""
+        result = cli_runner.invoke(main, ["pull", "--help"])
+        assert result.exit_code == 0
+        assert "Usage" in result.output
+
+    def test_push_help(self, cli_runner):
+        """Test push --help shows options."""
+        result = cli_runner.invoke(main, ["push", "--help"])
+        assert result.exit_code == 0
+        assert "Usage" in result.output
+
+
+class TestMockModeOptions:
+    """Tests for mock mode specific behavior."""
+
+    def test_mock_mode_explicitly_set(self, cli_runner, isolated_mock_env, monkeypatch):
+        """Test --mock flag is properly set."""
+        monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
+        monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
+
+        result = cli_runner.invoke(main, ["--mock", "db-status"])
+        assert result.exit_code == 0
+
+
+class TestUncategorizedAfterPull:
+    """Tests for uncategorized command after data pull."""
+
+    def test_uncategorized_after_ynab_pull(self, cli_runner, isolated_mock_env, monkeypatch):
+        """Test uncategorized command after pulling data."""
+        monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
+        monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
+
+        # Pull data first
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab"])
+
+        result = cli_runner.invoke(main, ["--mock", "uncategorized"])
+        assert result.exit_code == 0

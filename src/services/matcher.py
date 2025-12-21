@@ -9,13 +9,16 @@ Uses database cache for Amazon order lookups (data populated via 'pull' command)
 
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 from ..config import CategorizationConfig, PayeesConfig
 from ..db.database import AmazonOrderCache, Database
 from ..models import AmazonOrder, OrderItem, OrderMatch, Transaction
 from ..utils import is_amazon_payee
 from .amazon_matcher import AmazonOrderMatcher, TransactionInfo
+
+if TYPE_CHECKING:
+    from .protocols import AmazonMatcherProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +31,7 @@ class TransactionMatcher:
         db: Database,
         categorization_config: CategorizationConfig,
         payees_config: PayeesConfig,
+        amazon_matcher: Optional[Union[AmazonOrderMatcher, "AmazonMatcherProtocol"]] = None,
     ):
         """Initialize matcher.
 
@@ -35,12 +39,14 @@ class TransactionMatcher:
             db: Database for cached Amazon order lookups.
             categorization_config: Config for matching parameters.
             payees_config: Config for identifying Amazon payees.
+            amazon_matcher: Optional injected matcher. If None, creates one using db.
         """
         self._db = db
         self._window_days = categorization_config.date_match_window_days
         self._amazon_patterns = [p.upper() for p in payees_config.amazon_patterns]
         # Delegate to AmazonOrderMatcher for actual matching logic
-        self._amazon_matcher = AmazonOrderMatcher(db)
+        # Accept injected matcher for testability
+        self._amazon_matcher = amazon_matcher or AmazonOrderMatcher(db)
 
     def _cached_to_order(self, cached: AmazonOrderCache) -> AmazonOrder:
         """Convert database cache model to domain model.

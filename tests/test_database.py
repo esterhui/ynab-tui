@@ -1046,3 +1046,98 @@ class TestAmazonItemCategoryHistory:
 
         assert database.get_unique_item_count() == 2
         assert database.get_item_category_history_count() == 3
+
+
+# =============================================================================
+# Database Context Manager Tests
+# =============================================================================
+
+
+class TestDatabaseContextManager:
+    """Tests for database connection context manager."""
+
+    def test_context_manager_commits_on_success(self, database):
+        """Test that context manager commits on successful operations."""
+        with database._connection() as conn:
+            conn.execute(
+                "INSERT INTO categorization_history (payee_name, payee_normalized, category_name, category_id) "
+                "VALUES (?, ?, ?, ?)",
+                ("Test Payee", "test payee", "Test Category", "cat-test"),
+            )
+        # After context exits, should be committed
+        history = database.get_payee_history("Test Payee")
+        assert len(history) == 1
+
+    def test_context_manager_rollback_on_exception(self, database):
+        """Test that context manager rolls back on exception."""
+        try:
+            with database._connection() as conn:
+                conn.execute(
+                    "INSERT INTO categorization_history (payee_name, payee_normalized, category_name, category_id) "
+                    "VALUES (?, ?, ?, ?)",
+                    ("Rollback Payee", "rollback payee", "Test Category", "cat-test"),
+                )
+                # Force an exception
+                raise ValueError("Test exception")
+        except ValueError:
+            pass  # Expected exception
+
+        # Transaction should have been rolled back
+        history = database.get_payee_history("Rollback Payee")
+        assert len(history) == 0
+
+    def test_multiple_operations_in_context(self, database):
+        """Test multiple operations within single context."""
+        with database._connection() as conn:
+            conn.execute(
+                "INSERT INTO categorization_history (payee_name, payee_normalized, category_name, category_id) "
+                "VALUES (?, ?, ?, ?)",
+                ("Multi1", "multi1", "Cat1", "cat-1"),
+            )
+            conn.execute(
+                "INSERT INTO categorization_history (payee_name, payee_normalized, category_name, category_id) "
+                "VALUES (?, ?, ?, ?)",
+                ("Multi2", "multi2", "Cat2", "cat-2"),
+            )
+        # Both should be committed
+        assert len(database.get_payee_history("Multi1")) == 1
+        assert len(database.get_payee_history("Multi2")) == 1
+
+    def test_connection_reuse(self, database):
+        """Test that connections are properly reused."""
+        # Multiple context uses should work without issue
+        for i in range(5):
+            with database._connection() as conn:
+                conn.execute(
+                    "INSERT INTO categorization_history (payee_name, payee_normalized, category_name, category_id) "
+                    "VALUES (?, ?, ?, ?)",
+                    (f"Reuse{i}", f"reuse{i}", "Category", "cat-1"),
+                )
+
+        # All should be committed
+        for i in range(5):
+            history = database.get_payee_history(f"Reuse{i}")
+            assert len(history) == 1
+
+
+class TestDatabaseClose:
+    """Tests for database close behavior."""
+
+    def test_close_method(self, temp_db_path):
+        """Test that close() works without error."""
+        db = Database(temp_db_path)
+        # Do some operation
+        db.add_categorization("Test", "Cat", "cat-1")
+        # Close should work
+        db.close()
+
+    def test_operations_after_close(self, temp_db_path):
+        """Test behavior after closing database."""
+        db = Database(temp_db_path)
+        db.add_categorization("Test", "Cat", "cat-1")
+        db.close()
+        # Reopening should work fine (new instance)
+        db2 = Database(temp_db_path)
+        history = db2.get_payee_history("Test")
+        assert len(history) == 1
+        db2.close()

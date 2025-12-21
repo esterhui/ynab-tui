@@ -1025,7 +1025,7 @@ wheels = [
 [[package]]
 name = "ynab-tui"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "amazon-orders" },
     { name = "click" },

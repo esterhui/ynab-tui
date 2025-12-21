@@ -670,7 +670,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
     def _get_categories_for_picker(self) -> list[dict]:
         """Get categories formatted for the picker modal."""
         categories = []
-        for group in self._categorizer.categories.groups:
+        for group in self._categorizer.get_category_groups():
             for cat in group.categories:
                 if not cat.hidden and not cat.deleted:
                     categories.append(
@@ -703,7 +703,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                 amazon_items=None,
             )
             categories = self._get_categories_for_picker()
-            match_style = self._categorizer._config.display.search_match_style
+            match_style = self._categorizer.get_search_match_style()
             modal = CategoryPickerModal(
                 categories=categories,
                 transaction=summary,
@@ -737,7 +737,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             )
 
             categories = self._get_categories_for_picker()
-            match_style = self._categorizer._config.display.search_match_style
+            match_style = self._categorizer.get_search_match_style()
             modal = CategoryPickerModal(
                 categories=categories,
                 transaction=summary,
@@ -804,7 +804,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         if not transactions:
             self.notify("No transactions to search", severity="warning")
             return
-        match_style = self._categorizer._config.display.search_match_style
+        match_style = self._categorizer.get_search_match_style()
         modal = TransactionSearchModal(
             transactions=transactions,
             match_style=match_style,
@@ -828,7 +828,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         if not categories:
             self.notify("No categories available", severity="warning")
             return
-        match_style = self._categorizer._config.display.search_match_style
+        match_style = self._categorizer.get_search_match_style()
         modal = CategoryFilterModal(
             categories=categories,
             match_style=match_style,
@@ -861,7 +861,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         if not payees:
             self.notify("No payees available", severity="warning")
             return
-        match_style = self._categorizer._config.display.search_match_style
+        match_style = self._categorizer.get_search_match_style()
         modal = PayeeFilterModal(
             payees=payees,
             match_style=match_style,
@@ -932,7 +932,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                 amazon_items=[item.get("item_name", "Unknown")],
             )
             categories = self._get_categories_for_picker()
-            match_style = self._categorizer._config.display.search_match_style
+            match_style = self._categorizer.get_search_match_style()
             modal = CategoryPickerModal(
                 categories=categories,
                 transaction=summary,
@@ -1097,7 +1097,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
 
     def action_settings(self) -> None:
         """Show settings screen."""
-        screen = SettingsScreen(config=self._categorizer._config)
+        screen = SettingsScreen(config=self._categorizer.get_config())
         self.push_screen(screen)
 
     def action_switch_budget(self) -> None:
@@ -1112,7 +1112,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                 self.notify("Only one budget available", severity="information")
                 return
 
-            match_style = self._categorizer._config.display.search_match_style
+            match_style = self._categorizer.get_search_match_style()
             modal = BudgetPickerModal(
                 budgets=budgets,
                 current_budget_id=self._current_budget_id,

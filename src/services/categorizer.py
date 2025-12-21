@@ -191,6 +191,30 @@ class CategorizerService:
         self._categories = self._db_categories_to_list(db_groups)
         return self._categories
 
+    def get_config(self) -> Config:
+        """Get the application configuration.
+
+        Returns:
+            Application config object.
+        """
+        return self._config
+
+    def get_search_match_style(self) -> str:
+        """Get the search match style setting.
+
+        Returns:
+            Match style: 'prefix', 'contains', or 'fuzzy'.
+        """
+        return self._config.display.search_match_style
+
+    def get_category_groups(self) -> list[CategoryGroup]:
+        """Get list of category groups.
+
+        Returns:
+            List of CategoryGroup objects.
+        """
+        return self.categories.groups
+
     def get_pending_transactions(self) -> TransactionBatch:
         """Fetch and enrich all pending (uncategorized) transactions from database.
 

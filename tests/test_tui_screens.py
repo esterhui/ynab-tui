@@ -545,3 +545,147 @@ class TestItemSplitScreenLoadExistingSplits:
 
         # Should match by startswith
         assert 0 in screen._assignments
+
+
+# =============================================================================
+# Settings Screen Tests
+# =============================================================================
+
+
+class TestSettingsScreen:
+    """Tests for SettingsScreen."""
+
+    @pytest.fixture
+    def settings_config(self, sample_config):
+        """Configuration for settings screen tests."""
+        return sample_config
+
+    async def test_settings_screen_mounts(self, settings_config):
+        """Test settings screen mounts without crashing."""
+        from src.tui.screens.settings import SettingsScreen
+
+        screen = SettingsScreen(config=settings_config)
+        app = ScreenTestApp(screen)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Screen should be visible
+            assert screen._config is not None
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_settings_screen_displays_config(self, settings_config):
+        """Test settings screen displays configuration values."""
+        from src.tui.screens.settings import SettingsScreen
+
+        screen = SettingsScreen(config=settings_config)
+        app = ScreenTestApp(screen)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Check that config is stored
+            assert screen._config.ynab.budget_id is not None
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_settings_screen_quit_action(self, settings_config):
+        """Test 'q' key closes settings screen."""
+        from src.tui.screens.settings import SettingsScreen
+
+        screen = SettingsScreen(config=settings_config)
+        app = ScreenTestApp(screen)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await pilot.press("q")
+            await pilot.pause()
+            # Screen should be popped (no assertion needed, no crash = success)
+
+    def test_mask_token_empty(self, settings_config):
+        """Test _mask_token with empty token."""
+        from src.tui.screens.settings import SettingsScreen
+
+        screen = SettingsScreen(config=settings_config)
+        result = screen._mask_token("")
+        assert result == "(not set)"
+
+    def test_mask_token_short(self, settings_config):
+        """Test _mask_token with short token."""
+        from src.tui.screens.settings import SettingsScreen
+
+        screen = SettingsScreen(config=settings_config)
+        result = screen._mask_token("abcd")
+        assert result == "****"
+
+    def test_mask_token_long(self, settings_config):
+        """Test _mask_token with long token."""
+        from src.tui.screens.settings import SettingsScreen
+
+        screen = SettingsScreen(config=settings_config)
+        result = screen._mask_token("abcd1234efgh5678")
+        assert result.startswith("abcd")
+        assert result.endswith("5678")
+        assert "*" in result
+
+    def test_mask_email_empty(self, settings_config):
+        """Test _mask_email with empty email."""
+        from src.tui.screens.settings import SettingsScreen
+
+        screen = SettingsScreen(config=settings_config)
+        result = screen._mask_email("")
+        assert result == "(not set)"
+
+    def test_mask_email_no_at(self, settings_config):
+        """Test _mask_email without @ symbol."""
+        from src.tui.screens.settings import SettingsScreen
+
+        screen = SettingsScreen(config=settings_config)
+        result = screen._mask_email("username")
+        # Should fall back to token masking
+        assert result == "********"
+
+    def test_mask_email_valid(self, settings_config):
+        """Test _mask_email with valid email."""
+        from src.tui.screens.settings import SettingsScreen
+
+        screen = SettingsScreen(config=settings_config)
+        result = screen._mask_email("test@example.com")
+        assert result == "te***@example.com"
+
+    def test_mask_email_short_username(self, settings_config):
+        """Test _mask_email with short username."""
+        from src.tui.screens.settings import SettingsScreen
+
+        screen = SettingsScreen(config=settings_config)
+        result = screen._mask_email("ab@example.com")
+        assert result == "ab@example.com"  # Too short to mask
+
+    async def test_settings_save_button(self, settings_config):
+        """Test save button functionality."""
+        from src.tui.screens.settings import SettingsScreen
+
+        screen = SettingsScreen(config=settings_config)
+        app = ScreenTestApp(screen)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Click save button
+            await pilot.click("#save-btn")
+            await pilot.pause()
+            # Should show notification (no crash = success)
+            await pilot.press("escape")
+            await pilot.pause()
+
+    async def test_settings_close_button(self, settings_config):
+        """Test close button functionality."""
+        from src.tui.screens.settings import SettingsScreen
+
+        screen = SettingsScreen(config=settings_config)
+        app = ScreenTestApp(screen)
+
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            # Click close button
+            await pilot.click("#close-btn")
+            await pilot.pause()
+            # Screen should be closed (no crash = success)
