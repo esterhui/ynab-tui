@@ -29,7 +29,7 @@ class AmazonMatcherProtocol(Protocol):
         Returns:
             AmazonMatchResult with all match types.
         """
-        ...
+        pass
 
     def get_orders_for_date_range(
         self, transactions: list[TransactionInfo]
@@ -42,7 +42,7 @@ class AmazonMatcherProtocol(Protocol):
         Returns:
             Orders within extended date range of transactions.
         """
-        ...
+        pass
 
     def normalize_transaction(self, txn: dict) -> TransactionInfo:
         """Convert raw transaction dict to TransactionInfo.
@@ -53,4 +53,4 @@ class AmazonMatcherProtocol(Protocol):
         Returns:
             Normalized TransactionInfo object.
         """
-        ...
+        pass

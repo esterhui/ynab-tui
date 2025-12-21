@@ -26,7 +26,7 @@ class AmazonOrderRepositoryProtocol(Protocol):
         Returns:
             List of orders within the range.
         """
-        ...
+        pass
 
     def get_order_items_with_prices(self, order_id: str) -> list[dict[str, Any]]:
         """Get items for an order with price information.
@@ -37,7 +37,7 @@ class AmazonOrderRepositoryProtocol(Protocol):
         Returns:
             List of item dicts with item_name, item_price, quantity.
         """
-        ...
+        pass
 
 
 class TransactionRepositoryProtocol(Protocol):
@@ -57,7 +57,7 @@ class TransactionRepositoryProtocol(Protocol):
         Returns:
             List of transaction dicts.
         """
-        ...
+        pass
 
     def get_transaction(self, txn_id: str) -> Optional[dict[str, Any]]:
         """Get single transaction by ID.
@@ -68,7 +68,7 @@ class TransactionRepositoryProtocol(Protocol):
         Returns:
             Transaction dict or None if not found.
         """
-        ...
+        pass
 
 
 class PendingChangesRepositoryProtocol(Protocol):
@@ -92,7 +92,7 @@ class PendingChangesRepositoryProtocol(Protocol):
         Returns:
             True if change was created/updated.
         """
-        ...
+        pass
 
     def get_change(self, txn_id: str) -> Optional[dict[str, Any]]:
         """Get pending change for a transaction.
@@ -103,7 +103,7 @@ class PendingChangesRepositoryProtocol(Protocol):
         Returns:
             Change dict or None if no pending change.
         """
-        ...
+        pass
 
     def delete_change(self, txn_id: str) -> bool:
         """Delete pending change for a transaction.
@@ -114,7 +114,7 @@ class PendingChangesRepositoryProtocol(Protocol):
         Returns:
             True if change was deleted.
         """
-        ...
+        pass
 
     def get_all_changes(self) -> list[dict[str, Any]]:
         """Get all pending changes.
@@ -122,7 +122,7 @@ class PendingChangesRepositoryProtocol(Protocol):
         Returns:
             List of pending change dicts.
         """
-        ...
+        pass
 
 
 class HistoryRepositoryProtocol(Protocol):
@@ -145,7 +145,7 @@ class HistoryRepositoryProtocol(Protocol):
             category_name: Category name.
             amazon_items: Optional list of Amazon item names.
         """
-        ...
+        pass
 
     def get_payee_category_distributions_batch(
         self, payee_names: list[str]
@@ -158,4 +158,4 @@ class HistoryRepositoryProtocol(Protocol):
         Returns:
             Dict mapping payee -> category_id -> {name, count, pct}.
         """
-        ...
+        pass

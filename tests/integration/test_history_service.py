@@ -141,12 +141,13 @@ class TestFormatHistoryForPrompt:
         self, temp_db: Database, history_service: HistoryService
     ) -> None:
         """Formats history as readable string."""
-        temp_db.add_categorization("Amazon.com", "Shopping", "cat-1", 50.0)
-        temp_db.add_categorization("Amazon.com", "Shopping", "cat-1", 60.0)
+        payee = "Amazon.com"
+        temp_db.add_categorization(payee, "Shopping", "cat-1", 50.0)
+        temp_db.add_categorization(payee, "Shopping", "cat-1", 60.0)
 
-        result = history_service.format_history_for_prompt("Amazon.com")
+        result = history_service.format_history_for_prompt(payee)
 
-        assert "Amazon.com" in result
+        assert payee in result
         assert "Shopping" in result
         assert "2 txns" in result or "2 transactions" in result
 

@@ -116,16 +116,18 @@ class TestHistoryMixin:
 
     def test_get_payee_category_distributions_batch(self, temp_db: Database) -> None:
         """Can get distributions for multiple payees."""
-        temp_db.add_categorization("Amazon.com", "Shopping", "cat-1")
-        temp_db.add_categorization("Amazon.com", "Electronics", "cat-2")
-        temp_db.add_categorization("Walmart", "Groceries", "cat-3")
-        temp_db.add_categorization("Walmart", "Groceries", "cat-3")
+        amazon = "Amazon.com"
+        walmart = "Walmart"
+        temp_db.add_categorization(amazon, "Shopping", "cat-1")
+        temp_db.add_categorization(amazon, "Electronics", "cat-2")
+        temp_db.add_categorization(walmart, "Groceries", "cat-3")
+        temp_db.add_categorization(walmart, "Groceries", "cat-3")
 
-        result = temp_db.get_payee_category_distributions_batch(["Amazon.com", "Walmart"])
+        result = temp_db.get_payee_category_distributions_batch([amazon, walmart])
 
-        assert "Amazon.com" in result
-        assert "Walmart" in result
-        assert result["Walmart"]["Groceries"]["count"] == 2
+        assert amazon in result
+        assert walmart in result
+        assert result[walmart]["Groceries"]["count"] == 2
 
 
 class TestItemCategoryHistory:

@@ -642,8 +642,9 @@ class TestBuildPushSummary:
 
         result = sync_service._build_push_summary(changes)
 
+        payee = changes[0]["payee_name"]
         assert "2025-11-24" in result
-        assert "Amazon.com" in result
+        assert payee in result
         assert "Groceries" in result
 
     def test_formats_memo_change(self, sync_service: SyncService) -> None:
