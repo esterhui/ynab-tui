@@ -287,6 +287,11 @@ def update_pyproject_version(
     root: Path, current: Version, new_version: Version, dry_run: bool
 ) -> bool:
     """Update version in pyproject.toml."""
+    # If version is already correct, nothing to do
+    if current == new_version:
+        print_success(f"pyproject.toml already at {new_version}")
+        return True
+
     pyproject = root / "pyproject.toml"
     content = pyproject.read_text()
 
