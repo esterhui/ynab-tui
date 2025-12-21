@@ -1,3 +1,5 @@
-"""YNAB TUI - AI-powered transaction categorization."""
+"""YNAB TUI - Transaction categorization with Amazon order matching."""
 
-__version__ = "0.1.0"
+from importlib.metadata import version
+
+__version__ = version("ynab-tui")

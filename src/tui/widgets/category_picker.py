@@ -20,7 +20,7 @@ class CategoryPicker(NavigationMixin, Vertical):
     - Search/filter as you type
     - Vim-style navigation (j/k)
     - Groups categories by category group
-    - Highlights AI-suggested category
+    - Highlights suggested category
     """
 
     DEFAULT_CSS = """
@@ -98,7 +98,7 @@ class CategoryPicker(NavigationMixin, Vertical):
 
         Args:
             categories: List of category dicts with id, name, group_name.
-            suggested_id: ID of AI-suggested category to highlight.
+            suggested_id: ID of suggested category to highlight.
         """
         super().__init__(**kwargs)
         self._all_categories = categories
@@ -180,7 +180,7 @@ class CategoryPicker(NavigationMixin, Vertical):
                 # Format label
                 label = cat["name"]
                 if cat["id"] == self._suggested_id:
-                    label = f"★ {label} (AI suggested)"
+                    label = f"★ {label} (suggested)"
 
                 item = Static(label, classes=classes)
                 item.data = cat  # type: ignore[attr-defined]  # Textual widget data

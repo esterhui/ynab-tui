@@ -1116,8 +1116,7 @@ def mappings_create(ctx, since, dry_run):
     Scans historical approved Amazon transactions and builds a database of
     which YNAB categories are typically assigned to which Amazon items.
 
-    This creates mappings that can be used for future categorization suggestions
-    without needing AI.
+    This creates mappings that can be used for future categorization suggestions.
 
     \b
     Examples:

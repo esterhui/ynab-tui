@@ -17,15 +17,10 @@ jobs:
       - name: Check version matches
         run: |
           PYPROJECT_VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
-          INIT_VERSION=$(grep '__version__' src/__init__.py | cut -d'"' -f2)
           INPUT_VERSION="${{ inputs.version }}"
 
           if [ "$PYPROJECT_VERSION" != "$INPUT_VERSION" ]; then
             echo "Error: pyproject.toml version ($PYPROJECT_VERSION) != input ($INPUT_VERSION)"
-            exit 1
-          fi
-          if [ "$INIT_VERSION" != "$INPUT_VERSION" ]; then
-            echo "Error: __init__.py version ($INIT_VERSION) != input ($INPUT_VERSION)"
             exit 1
           fi
           echo "Version $INPUT_VERSION validated successfully"

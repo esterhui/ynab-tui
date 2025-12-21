@@ -78,7 +78,7 @@ class HistoryService:
         return self._db.get_payee_history(payee_name, limit=limit)
 
     def format_history_for_prompt(self, payee_name: str) -> str:
-        """Format payee history for AI prompt context.
+        """Format payee history as context string.
 
         Args:
             payee_name: Payee to format history for.
