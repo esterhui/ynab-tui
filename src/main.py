@@ -701,38 +701,54 @@ def pull(ctx, full, ynab_only, amazon_only, amazon_year, since_days):
 
     # Pull Amazon
     if not ynab_only:
-        click.echo("\nPulling Amazon orders...")
-        amazon_state = sync_service._db.get_sync_state("amazon")
-        if amazon_year:
-            click.echo(f"  Fetching year: {amazon_year}")
-        elif since_days:
-            click.echo(f"  Fetching last {since_days} days")
-        elif full:
-            click.echo("  Full sync requested")
-        elif amazon_state and amazon_state.get("last_sync_at"):
-            from datetime import datetime as dt
-            from datetime import timedelta
+        mock = ctx.obj.get("mock", False)
+        has_amazon_creds = mock or (config.amazon.username and config.amazon.password)
 
-            click.echo(f"  Last sync: {amazon_state['last_sync_at'].strftime('%Y-%m-%d %H:%M')}")
-            days_since = (dt.now() - amazon_state["last_sync_date"]).days + sync_overlap_days
-            since_date = dt.now() - timedelta(days=days_since)
-            click.echo(f"  Fetching since: {since_date.strftime('%Y-%m-%d')}")
+        if not has_amazon_creds:
+            if amazon_only:
+                # User explicitly requested Amazon-only but no credentials
+                click.echo(click.style("\nError: Amazon credentials not configured.", fg="red"))
+                click.echo("Set AMAZON_USERNAME and AMAZON_PASSWORD environment variables")
+                click.echo("or configure in config.toml")
+                return
+            else:
+                # Just skip Amazon with informational message
+                click.echo("\nSkipping Amazon (no credentials configured)")
         else:
-            click.echo("  First sync - fetching all orders")
+            click.echo("\nPulling Amazon orders...")
+            amazon_state = sync_service._db.get_sync_state("amazon")
+            if amazon_year:
+                click.echo(f"  Fetching year: {amazon_year}")
+            elif since_days:
+                click.echo(f"  Fetching last {since_days} days")
+            elif full:
+                click.echo("  Full sync requested")
+            elif amazon_state and amazon_state.get("last_sync_at"):
+                from datetime import datetime as dt
+                from datetime import timedelta
 
-        result = sync_service.pull_amazon(full=full, year=amazon_year, since_days=since_days)
-        results["amazon"] = result
-
-        if result.success:
-            click.echo(click.style(f"  ✓ Fetched {result.fetched} orders", fg="green"))
-            if result.oldest_date and result.newest_date:
                 click.echo(
-                    f"    Date range: {result.oldest_date.strftime('%Y-%m-%d')} to {result.newest_date.strftime('%Y-%m-%d')}"
+                    f"  Last sync: {amazon_state['last_sync_at'].strftime('%Y-%m-%d %H:%M')}"
                 )
-            click.echo(f"    Inserted: {result.inserted}, Updated: {result.updated}")
-            click.echo(f"    Total in database: {result.total}")
-        else:
-            click.echo(click.style(f"  ✗ Error: {result.errors}", fg="red"))
+                days_since = (dt.now() - amazon_state["last_sync_date"]).days + sync_overlap_days
+                since_date = dt.now() - timedelta(days=days_since)
+                click.echo(f"  Fetching since: {since_date.strftime('%Y-%m-%d')}")
+            else:
+                click.echo("  First sync - fetching all orders")
+
+            result = sync_service.pull_amazon(full=full, year=amazon_year, since_days=since_days)
+            results["amazon"] = result
+
+            if result.success:
+                click.echo(click.style(f"  ✓ Fetched {result.fetched} orders", fg="green"))
+                if result.oldest_date and result.newest_date:
+                    click.echo(
+                        f"    Date range: {result.oldest_date.strftime('%Y-%m-%d')} to {result.newest_date.strftime('%Y-%m-%d')}"
+                    )
+                click.echo(f"    Inserted: {result.inserted}, Updated: {result.updated}")
+                click.echo(f"    Total in database: {result.total}")
+            else:
+                click.echo(click.style(f"  ✗ Error: {result.errors}", fg="red"))
 
     click.echo("\nPull complete!")
 
