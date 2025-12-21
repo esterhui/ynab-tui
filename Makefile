@@ -123,10 +123,11 @@ version-check:
 
 release: version-check check test build
 	@echo ""
-	@echo "Build complete! Next steps:"
-	@echo "  1. Create git tag: git tag v$$(grep '^version = ' pyproject.toml | cut -d'\"' -f2)"
-	@echo "  2. Push tag: git push origin --tags"
-	@echo "  3. Go to GitHub Actions and trigger 'Publish to PyPI' workflow"
-	@echo ""
-	@echo "Built artifacts in dist/:"
+	@VERSION=$$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml); \
+	echo "Build complete! Next steps:"; \
+	echo "  1. Create git tag: git tag v$$VERSION"; \
+	echo "  2. Push tag: git push origin --tags"; \
+	echo "  3. Go to GitHub Actions and trigger 'Publish to PyPI' workflow"; \
+	echo ""; \
+	echo "Built artifacts in dist/:"
 	@ls -la dist/
