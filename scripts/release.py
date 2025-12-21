@@ -13,6 +13,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
+from functools import total_ordering
 from datetime import date
 from pathlib import Path
 
@@ -91,6 +92,7 @@ def print_dry_run(text: str) -> None:
 # =============================================================================
 
 
+@total_ordering
 @dataclass
 class Version:
     """Semantic version."""

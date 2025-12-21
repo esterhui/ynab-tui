@@ -229,6 +229,7 @@ class FuzzySelectModal(ModalScreen[Optional[T]], Generic[T]):
             max_index = len(list_view) - 1
             if max_index < 0:
                 return
+            new_index = current  # Default, will be updated below
             if event.key == "pageup":
                 new_index = max(current - 10, 0)
             elif event.key == "pagedown":

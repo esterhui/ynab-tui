@@ -216,7 +216,6 @@ def display_amazon_match_results(
             duplicates_by_order[order.order_id]["txns"].append(txn_info)
 
         for order_id, data in duplicates_by_order.items():
-            order = data["order"]
             for txn_info, matched_order in result.all_matches:
                 if matched_order.order_id == order_id:
                     data["original_txn"] = txn_info
