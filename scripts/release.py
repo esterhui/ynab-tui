@@ -214,6 +214,17 @@ def create_git_commit(root: Path, version: Version, dry_run: bool) -> bool:
             check=True,
         )
 
+        # Check if there are staged changes
+        status = subprocess.run(
+            ["git", "diff", "--cached", "--quiet"],
+            capture_output=True,
+            cwd=root,
+        )
+        if status.returncode == 0:
+            # No staged changes - nothing to commit
+            print_success("No version changes to commit")
+            return True
+
         # Create commit
         result = subprocess.run(
             ["git", "commit", "-m", message],
