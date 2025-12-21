@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Callable, Optional
 
 from tqdm import tqdm
 
-from src.config import AmazonConfig, CategorizationConfig
+from ynab_tui.config import AmazonConfig, CategorizationConfig
 
 logger = logging.getLogger(__name__)
 

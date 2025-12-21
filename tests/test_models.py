@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from src.models import (
+from ynab_tui.models import (
     AmazonOrder,
     Category,
     CategoryGroup,
@@ -364,7 +364,7 @@ class TestSubTransaction:
 
     def test_basic_creation(self):
         """Test basic subtransaction creation."""
-        from src.models import SubTransaction
+        from ynab_tui.models import SubTransaction
 
         sub = SubTransaction(
             id="sub-001",
@@ -377,7 +377,7 @@ class TestSubTransaction:
 
     def test_optional_fields(self):
         """Test optional fields default to None."""
-        from src.models import SubTransaction
+        from ynab_tui.models import SubTransaction
 
         sub = SubTransaction(
             id="sub-001",
@@ -392,7 +392,7 @@ class TestSubTransaction:
 
     def test_full_subtransaction(self):
         """Test subtransaction with all fields."""
-        from src.models import SubTransaction
+        from ynab_tui.models import SubTransaction
 
         sub = SubTransaction(
             id="sub-001",
@@ -409,7 +409,7 @@ class TestSubTransaction:
 
     def test_is_uncategorized(self):
         """Test is_uncategorized property."""
-        from src.models import SubTransaction
+        from ynab_tui.models import SubTransaction
 
         # Uncategorized (no category_id)
         sub1 = SubTransaction(
@@ -431,7 +431,7 @@ class TestSubTransaction:
 
     def test_display_amount(self):
         """Test display_amount property."""
-        from src.models import SubTransaction
+        from ynab_tui.models import SubTransaction
 
         # Negative (outflow)
         sub1 = SubTransaction(id="sub-1", transaction_id="txn-1", amount=-47.82)

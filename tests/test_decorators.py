@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.clients.decorators import with_retry, wrap_client_errors
+from ynab_tui.clients.decorators import with_retry, wrap_client_errors
 
 
 class CustomError(Exception):
@@ -125,7 +125,7 @@ class TestWithRetry:
                 raise Exception("transient error")
             return "success"
 
-        with patch("src.clients.decorators.time.sleep"):
+        with patch("ynab_tui.clients.decorators.time.sleep"):
             result = fails_twice()
 
         assert result == "success"
@@ -141,7 +141,7 @@ class TestWithRetry:
             call_count += 1
             raise Exception("persistent error")
 
-        with patch("src.clients.decorators.time.sleep"):
+        with patch("ynab_tui.clients.decorators.time.sleep"):
             with pytest.raises(Exception, match="persistent error"):
                 always_fails()
 
@@ -235,7 +235,7 @@ class TestWithRetry:
                 raise Exception("HTTP 500: Internal Server Error")
             return "recovered"
 
-        with patch("src.clients.decorators.time.sleep"):
+        with patch("ynab_tui.clients.decorators.time.sleep"):
             result = raises_500_then_succeeds()
 
         assert result == "recovered"
@@ -252,7 +252,7 @@ class TestWithRetry:
             call_count += 1
             raise Exception("error")
 
-        with patch("src.clients.decorators.time.sleep") as mock_sleep:
+        with patch("ynab_tui.clients.decorators.time.sleep") as mock_sleep:
             mock_sleep.side_effect = lambda d: delays.append(d)
             with pytest.raises(Exception):
                 always_fails()
@@ -274,7 +274,7 @@ class TestWithRetry:
             call_count += 1
             raise Exception("error")
 
-        with patch("src.clients.decorators.time.sleep") as mock_sleep:
+        with patch("ynab_tui.clients.decorators.time.sleep") as mock_sleep:
             mock_sleep.side_effect = lambda d: delays.append(d)
             with pytest.raises(Exception):
                 always_fails()
@@ -292,12 +292,12 @@ class TestWithRetry:
             raise Exception("error")
 
         # Run twice and collect delays
-        with patch("src.clients.decorators.time.sleep") as mock_sleep:
+        with patch("ynab_tui.clients.decorators.time.sleep") as mock_sleep:
             mock_sleep.side_effect = lambda d: delays_run1.append(d)
             with pytest.raises(Exception):
                 fails_with_jitter()
 
-        with patch("src.clients.decorators.time.sleep") as mock_sleep:
+        with patch("ynab_tui.clients.decorators.time.sleep") as mock_sleep:
             mock_sleep.side_effect = lambda d: delays_run2.append(d)
             with pytest.raises(Exception):
                 fails_with_jitter()

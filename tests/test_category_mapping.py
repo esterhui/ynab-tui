@@ -4,14 +4,14 @@ from datetime import datetime
 
 import pytest
 
-from src.db.database import AmazonOrderCache
-from src.models import Transaction
-from src.services.category_mapping import (
+from ynab_tui.db.database import AmazonOrderCache
+from ynab_tui.models import Transaction
+from ynab_tui.services.category_mapping import (
     ItemCategoryPrediction,
     LearningResult,
     OrderCategoryPrediction,
 )
-from src.utils import is_amazon_payee
+from ynab_tui.utils import is_amazon_payee
 
 
 class TestLearningResult:

@@ -3,7 +3,7 @@
 import pytest
 from click.testing import CliRunner
 
-from src.main import main
+from ynab_tui.main import main
 
 
 @pytest.fixture
@@ -233,7 +233,7 @@ class TestPullCommand:
         assert result.exit_code == 0
 
         # Verify transactions have budget_id set (not NULL)
-        from src.db.database import Database
+        from ynab_tui.db.database import Database
 
         db = Database(isolated_mock_env / "mock_categorizer.db")
         txns = db.get_ynab_transactions(limit=10)
@@ -598,7 +598,7 @@ class TestUndoSpecificTransaction:
         cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
 
         # Get a transaction ID from the database
-        from src.db.database import Database
+        from ynab_tui.db.database import Database
 
         db = Database(isolated_mock_env / "mock_categorizer.db")
         txns = db.get_ynab_transactions(limit=1)
@@ -619,7 +619,7 @@ class TestUndoSpecificTransaction:
         # Pull data first
         cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
 
-        from src.db.database import Database
+        from ynab_tui.db.database import Database
 
         db = Database(isolated_mock_env / "mock_categorizer.db")
         txns = db.get_ynab_transactions(limit=1)
@@ -711,7 +711,7 @@ class TestPushCommandVariants:
         # Pull data first
         cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
 
-        from src.db.database import Database
+        from ynab_tui.db.database import Database
 
         db = Database(isolated_mock_env / "mock_categorizer.db")
         txns = db.get_ynab_transactions(limit=1)
@@ -749,7 +749,7 @@ class TestDBDeltasWithChanges:
         # Pull data first
         cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
 
-        from src.db.database import Database
+        from ynab_tui.db.database import Database
 
         db = Database(isolated_mock_env / "mock_categorizer.db")
         txns = db.get_ynab_transactions(limit=1)

@@ -7,7 +7,7 @@ that can be tested without running the full Textual application.
 from dataclasses import dataclass, field, replace
 from typing import Optional
 
-from src.models import Transaction
+from ynab_tui.models import Transaction
 
 # Filter state labels matching app.py FILTER_LABELS
 FILTER_LABELS = {

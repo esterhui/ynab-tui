@@ -2,8 +2,8 @@
 
 from datetime import datetime
 
-from src.db.database import CategorizationRecord, Database
-from src.models import Transaction
+from ynab_tui.db.database import CategorizationRecord, Database
+from ynab_tui.models import Transaction
 
 
 class TestDatabaseInit:

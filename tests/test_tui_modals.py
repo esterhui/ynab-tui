@@ -8,14 +8,14 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Static
 
-from src.models import Transaction
-from src.tui.modals.category_picker import (
+from ynab_tui.models import Transaction
+from ynab_tui.tui.modals.category_picker import (
     CategoryPickerModal,
     CategorySelection,
     TransactionSummary,
 )
-from src.tui.modals.fuzzy_select import FuzzySelectItem, FuzzySelectModal
-from src.tui.modals.transaction_search import TransactionSearchModal
+from ynab_tui.tui.modals.fuzzy_select import FuzzySelectItem, FuzzySelectModal
+from ynab_tui.tui.modals.transaction_search import TransactionSearchModal
 
 
 @pytest.fixture
@@ -444,7 +444,7 @@ class TestBudgetPickerModal:
 
     async def test_modal_opens_without_crash(self, sample_budgets):
         """Test modal opens successfully."""
-        from src.tui.modals.budget_picker import BudgetPickerModal
+        from ynab_tui.tui.modals.budget_picker import BudgetPickerModal
 
         modal = BudgetPickerModal(budgets=sample_budgets)
         app = ModalTestApp(modal)
@@ -456,7 +456,7 @@ class TestBudgetPickerModal:
 
     async def test_modal_with_current_budget(self, sample_budgets):
         """Test modal with current budget highlighted."""
-        from src.tui.modals.budget_picker import BudgetPickerModal
+        from ynab_tui.tui.modals.budget_picker import BudgetPickerModal
 
         modal = BudgetPickerModal(
             budgets=sample_budgets,
@@ -471,7 +471,7 @@ class TestBudgetPickerModal:
 
     async def test_modal_enter_selects(self, sample_budgets):
         """Test Enter key selects budget."""
-        from src.tui.modals.budget_picker import BudgetPickerModal
+        from ynab_tui.tui.modals.budget_picker import BudgetPickerModal
 
         modal = BudgetPickerModal(budgets=sample_budgets)
         app = ModalTestApp(modal)
@@ -483,7 +483,7 @@ class TestBudgetPickerModal:
 
     async def test_modal_typing_filter(self, sample_budgets):
         """Test typing to filter budgets."""
-        from src.tui.modals.budget_picker import BudgetPickerModal
+        from ynab_tui.tui.modals.budget_picker import BudgetPickerModal
 
         modal = BudgetPickerModal(budgets=sample_budgets)
         app = ModalTestApp(modal)
@@ -503,7 +503,7 @@ class TestBudgetSelection:
 
     def test_budget_selection_creation(self):
         """Test creating a BudgetSelection."""
-        from src.tui.modals.budget_picker import BudgetSelection
+        from ynab_tui.tui.modals.budget_picker import BudgetSelection
 
         selection = BudgetSelection(budget_id="budget-1", budget_name="My Budget")
         assert selection.budget_id == "budget-1"
@@ -515,7 +515,7 @@ class TestCategoryFilterModal:
 
     async def test_modal_opens_without_crash(self, sample_categories):
         """Test modal opens successfully."""
-        from src.tui.modals.category_filter import CategoryFilterModal
+        from ynab_tui.tui.modals.category_filter import CategoryFilterModal
 
         modal = CategoryFilterModal(categories=sample_categories)
         app = ModalTestApp(modal)
@@ -527,7 +527,7 @@ class TestCategoryFilterModal:
 
     async def test_modal_enter_selects(self, sample_categories):
         """Test Enter key selects category."""
-        from src.tui.modals.category_filter import CategoryFilterModal
+        from ynab_tui.tui.modals.category_filter import CategoryFilterModal
 
         modal = CategoryFilterModal(categories=sample_categories)
         app = ModalTestApp(modal)
@@ -539,7 +539,7 @@ class TestCategoryFilterModal:
 
     async def test_modal_typing_filter(self, sample_categories):
         """Test typing to filter categories."""
-        from src.tui.modals.category_filter import CategoryFilterModal
+        from ynab_tui.tui.modals.category_filter import CategoryFilterModal
 
         modal = CategoryFilterModal(categories=sample_categories)
         app = ModalTestApp(modal)
@@ -559,7 +559,7 @@ class TestCategoryFilterResult:
 
     def test_category_filter_result_creation(self):
         """Test creating a CategoryFilterResult."""
-        from src.tui.modals.category_filter import CategoryFilterResult
+        from ynab_tui.tui.modals.category_filter import CategoryFilterResult
 
         result = CategoryFilterResult(category_id="cat-1", category_name="Groceries")
         assert result.category_id == "cat-1"
@@ -576,7 +576,7 @@ class TestPayeeFilterModal:
 
     async def test_modal_opens_without_crash(self, sample_payees):
         """Test modal opens successfully."""
-        from src.tui.modals.payee_filter import PayeeFilterModal
+        from ynab_tui.tui.modals.payee_filter import PayeeFilterModal
 
         modal = PayeeFilterModal(payees=sample_payees)
         app = ModalTestApp(modal)
@@ -588,7 +588,7 @@ class TestPayeeFilterModal:
 
     async def test_modal_enter_selects(self, sample_payees):
         """Test Enter key selects payee."""
-        from src.tui.modals.payee_filter import PayeeFilterModal
+        from ynab_tui.tui.modals.payee_filter import PayeeFilterModal
 
         modal = PayeeFilterModal(payees=sample_payees)
         app = ModalTestApp(modal)
@@ -600,7 +600,7 @@ class TestPayeeFilterModal:
 
     async def test_modal_navigation(self, sample_payees):
         """Test navigation in payee filter."""
-        from src.tui.modals.payee_filter import PayeeFilterModal
+        from ynab_tui.tui.modals.payee_filter import PayeeFilterModal
 
         modal = PayeeFilterModal(payees=sample_payees)
         app = ModalTestApp(modal)
@@ -620,7 +620,7 @@ class TestGetUniquePayees:
 
     def test_get_unique_payees(self, sample_transactions):
         """Test extracting unique payees from transactions."""
-        from src.tui.modals.payee_filter import get_unique_payees
+        from ynab_tui.tui.modals.payee_filter import get_unique_payees
 
         payees = get_unique_payees(sample_transactions)
         assert len(payees) == 3
@@ -630,7 +630,7 @@ class TestGetUniquePayees:
 
     def test_get_unique_payees_empty(self):
         """Test extracting payees from empty list."""
-        from src.tui.modals.payee_filter import get_unique_payees
+        from ynab_tui.tui.modals.payee_filter import get_unique_payees
 
         payees = get_unique_payees([])
         assert len(payees) == 0
@@ -646,7 +646,7 @@ class TestMemoEditResult:
 
     def test_memo_edit_result_creation(self):
         """Test creating a MemoEditResult."""
-        from src.tui.modals.memo_edit import MemoEditResult
+        from ynab_tui.tui.modals.memo_edit import MemoEditResult
 
         result = MemoEditResult(memo="Test memo", changed=True)
         assert result.memo == "Test memo"
@@ -654,7 +654,7 @@ class TestMemoEditResult:
 
     def test_memo_edit_result_unchanged(self):
         """Test MemoEditResult with no change."""
-        from src.tui.modals.memo_edit import MemoEditResult
+        from ynab_tui.tui.modals.memo_edit import MemoEditResult
 
         result = MemoEditResult(memo="Same memo", changed=False)
         assert result.memo == "Same memo"
@@ -666,7 +666,7 @@ class TestTransactionInfo:
 
     def test_transaction_info_creation(self):
         """Test creating TransactionInfo."""
-        from src.tui.modals.memo_edit import TransactionInfo
+        from ynab_tui.tui.modals.memo_edit import TransactionInfo
 
         info = TransactionInfo(
             date="2024-01-15",
@@ -680,7 +680,7 @@ class TestTransactionInfo:
 
     def test_transaction_info_with_memo(self):
         """Test TransactionInfo with memo."""
-        from src.tui.modals.memo_edit import TransactionInfo
+        from ynab_tui.tui.modals.memo_edit import TransactionInfo
 
         info = TransactionInfo(
             date="2024-01-15",
@@ -697,7 +697,7 @@ class TestMemoEditModal:
     @pytest.fixture
     def sample_transaction_info(self):
         """Sample transaction info for testing."""
-        from src.tui.modals.memo_edit import TransactionInfo
+        from ynab_tui.tui.modals.memo_edit import TransactionInfo
 
         return TransactionInfo(
             date="2024-01-15",
@@ -709,7 +709,7 @@ class TestMemoEditModal:
     @pytest.fixture
     def transaction_info_no_memo(self):
         """Transaction info with no memo."""
-        from src.tui.modals.memo_edit import TransactionInfo
+        from ynab_tui.tui.modals.memo_edit import TransactionInfo
 
         return TransactionInfo(
             date="2024-01-15",
@@ -719,7 +719,7 @@ class TestMemoEditModal:
 
     async def test_modal_opens_without_crash(self, sample_transaction_info):
         """Test modal opens successfully."""
-        from src.tui.modals.memo_edit import MemoEditModal
+        from ynab_tui.tui.modals.memo_edit import MemoEditModal
 
         modal = MemoEditModal(transaction=sample_transaction_info)
         app = ModalTestApp(modal)
@@ -733,7 +733,7 @@ class TestMemoEditModal:
 
     async def test_modal_displays_transaction_info(self, sample_transaction_info):
         """Test modal shows transaction payee and amount."""
-        from src.tui.modals.memo_edit import MemoEditModal
+        from ynab_tui.tui.modals.memo_edit import MemoEditModal
 
         modal = MemoEditModal(transaction=sample_transaction_info)
         app = ModalTestApp(modal)
@@ -748,7 +748,7 @@ class TestMemoEditModal:
 
     async def test_modal_displays_current_memo(self, sample_transaction_info):
         """Test modal shows current memo."""
-        from src.tui.modals.memo_edit import MemoEditModal
+        from ynab_tui.tui.modals.memo_edit import MemoEditModal
 
         modal = MemoEditModal(transaction=sample_transaction_info)
         app = ModalTestApp(modal)
@@ -762,7 +762,7 @@ class TestMemoEditModal:
 
     async def test_modal_displays_no_memo_message(self, transaction_info_no_memo):
         """Test modal shows 'No memo set' when no memo exists."""
-        from src.tui.modals.memo_edit import MemoEditModal
+        from ynab_tui.tui.modals.memo_edit import MemoEditModal
 
         modal = MemoEditModal(transaction=transaction_info_no_memo)
         app = ModalTestApp(modal)
@@ -776,7 +776,7 @@ class TestMemoEditModal:
 
     async def test_cancel_returns_none(self, sample_transaction_info):
         """Test escape cancels and returns None."""
-        from src.tui.modals.memo_edit import MemoEditModal
+        from ynab_tui.tui.modals.memo_edit import MemoEditModal
 
         modal = MemoEditModal(transaction=sample_transaction_info)
         app = ModalTestApp(modal)
@@ -790,7 +790,7 @@ class TestMemoEditModal:
 
     async def test_save_returns_memo_result(self, sample_transaction_info):
         """Test enter saves and returns MemoEditResult."""
-        from src.tui.modals.memo_edit import MemoEditModal
+        from ynab_tui.tui.modals.memo_edit import MemoEditModal
 
         modal = MemoEditModal(transaction=sample_transaction_info)
         app = ModalTestApp(modal)
@@ -810,7 +810,7 @@ class TestMemoEditModal:
         """Test save detects when memo was changed."""
         from textual.widgets import Input
 
-        from src.tui.modals.memo_edit import MemoEditModal
+        from ynab_tui.tui.modals.memo_edit import MemoEditModal
 
         modal = MemoEditModal(transaction=sample_transaction_info)
         app = ModalTestApp(modal)
@@ -831,7 +831,7 @@ class TestMemoEditModal:
 
     async def test_save_unchanged_memo(self, transaction_info_no_memo):
         """Test save with unchanged empty memo."""
-        from src.tui.modals.memo_edit import MemoEditModal
+        from ynab_tui.tui.modals.memo_edit import MemoEditModal
 
         modal = MemoEditModal(transaction=transaction_info_no_memo)
         app = ModalTestApp(modal)
@@ -850,7 +850,7 @@ class TestMemoEditModal:
         """Test input is focused when modal opens."""
         from textual.widgets import Input
 
-        from src.tui.modals.memo_edit import MemoEditModal
+        from ynab_tui.tui.modals.memo_edit import MemoEditModal
 
         modal = MemoEditModal(transaction=sample_transaction_info)
         app = ModalTestApp(modal)
@@ -884,7 +884,7 @@ class TestCategoryFilterModalExtended:
 
     def test_format_category_with_group(self, filter_categories):
         """Test _format_category includes group name."""
-        from src.tui.modals.category_filter import CategoryFilterModal
+        from ynab_tui.tui.modals.category_filter import CategoryFilterModal
 
         result = CategoryFilterModal._format_category(filter_categories[0])
         assert "Groceries" in result
@@ -892,7 +892,7 @@ class TestCategoryFilterModalExtended:
 
     def test_format_category_without_group(self):
         """Test _format_category without group name."""
-        from src.tui.modals.category_filter import CategoryFilterModal
+        from ynab_tui.tui.modals.category_filter import CategoryFilterModal
 
         cat = {"id": "cat-1", "name": "Misc"}
         result = CategoryFilterModal._format_category(cat)
@@ -900,7 +900,7 @@ class TestCategoryFilterModalExtended:
 
     def test_search_text(self, filter_categories):
         """Test _search_text extracts searchable text."""
-        from src.tui.modals.category_filter import CategoryFilterModal
+        from ynab_tui.tui.modals.category_filter import CategoryFilterModal
 
         result = CategoryFilterModal._search_text(filter_categories[0])
         assert "Food" in result
@@ -908,7 +908,7 @@ class TestCategoryFilterModalExtended:
 
     def test_make_result(self, filter_categories):
         """Test _make_result creates CategoryFilterResult."""
-        from src.tui.modals.category_filter import (
+        from ynab_tui.tui.modals.category_filter import (
             CategoryFilterModal,
             CategoryFilterResult,
         )

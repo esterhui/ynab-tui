@@ -8,12 +8,12 @@ from datetime import datetime
 
 import pytest
 
-from src.clients import MockYNABClient
-from src.db.database import Database
-from src.models import Transaction
-from src.services.categorizer import CategorizerService
-from src.tui.app import YNABCategorizerApp
-from src.tui.state import TagManager, TagState
+from ynab_tui.clients import MockYNABClient
+from ynab_tui.db.database import Database
+from ynab_tui.models import Transaction
+from ynab_tui.services.categorizer import CategorizerService
+from ynab_tui.tui.app import YNABCategorizerApp
+from ynab_tui.tui.state import TagManager, TagState
 
 
 @pytest.fixture
@@ -270,7 +270,7 @@ class TestTUIPushPreview:
             await pilot.pause()
 
             # Verify push preview screen is showing
-            from src.tui.screens import PushPreviewScreen
+            from ynab_tui.tui.screens import PushPreviewScreen
 
             screens = tui_app_with_pending.screen_stack
             assert any(isinstance(s, PushPreviewScreen) for s in screens)
@@ -285,7 +285,7 @@ class TestTUIPushPreview:
             await pilot.pause()
 
             # Should not open a new screen (just show notification)
-            from src.tui.screens import PushPreviewScreen
+            from ynab_tui.tui.screens import PushPreviewScreen
 
             screens = tui_app.screen_stack
             assert not any(isinstance(s, PushPreviewScreen) for s in screens)
@@ -306,7 +306,7 @@ class TestTUIPushPreview:
             await pilot.pause()
 
             # Should return to main screen
-            from src.tui.screens import PushPreviewScreen
+            from ynab_tui.tui.screens import PushPreviewScreen
 
             screens = tui_app_with_pending.screen_stack
             assert not any(isinstance(s, PushPreviewScreen) for s in screens)
@@ -338,7 +338,7 @@ class TestTUIPushPreview:
             await tui_app_with_pending.workers.wait_for_complete()
 
             # Should return to main screen
-            from src.tui.screens import PushPreviewScreen
+            from ynab_tui.tui.screens import PushPreviewScreen
 
             screens = tui_app_with_pending.screen_stack
             assert not any(isinstance(s, PushPreviewScreen) for s in screens)
@@ -366,7 +366,7 @@ class TestTUIPushPreview:
             await pilot.pause()
 
             # Should still be on push preview screen
-            from src.tui.screens import PushPreviewScreen
+            from ynab_tui.tui.screens import PushPreviewScreen
 
             screens = tui_app_with_pending.screen_stack
             assert any(isinstance(s, PushPreviewScreen) for s in screens)
@@ -445,7 +445,7 @@ class TestTUISplitTransaction:
             await pilot.pause()
 
             # Should NOT open item split screen
-            from src.tui.screens import ItemSplitScreen
+            from ynab_tui.tui.screens import ItemSplitScreen
 
             screens = tui_app.screen_stack
             assert not any(isinstance(s, ItemSplitScreen) for s in screens)
@@ -466,7 +466,7 @@ class TestTUISplitTransaction:
             await pilot.pause()
 
             # Should NOT open item split screen
-            from src.tui.screens import ItemSplitScreen
+            from ynab_tui.tui.screens import ItemSplitScreen
 
             screens = tui_app_with_non_amazon_transaction.screen_stack
             assert not any(isinstance(s, ItemSplitScreen) for s in screens)
@@ -560,7 +560,7 @@ class TestTUISplitTransaction:
             await pilot.pause()
 
             # Check if ItemSplitScreen opened
-            from src.tui.screens import ItemSplitScreen
+            from ynab_tui.tui.screens import ItemSplitScreen
 
             screens = tui_app_with_multi_item_amazon.screen_stack
             split_screen = next((s for s in screens if isinstance(s, ItemSplitScreen)), None)
@@ -584,7 +584,7 @@ class TestTUISplitTransaction:
             await pilot.press("x")
             await pilot.pause()
 
-            from src.tui.screens import ItemSplitScreen
+            from ynab_tui.tui.screens import ItemSplitScreen
 
             screens = tui_app_with_multi_item_amazon.screen_stack
             split_screen = next((s for s in screens if isinstance(s, ItemSplitScreen)), None)
@@ -613,7 +613,7 @@ class TestTUISplitTransaction:
             await pilot.press("x")
             await pilot.pause()
 
-            from src.tui.screens import ItemSplitScreen
+            from ynab_tui.tui.screens import ItemSplitScreen
 
             screens = tui_app_with_multi_item_amazon.screen_stack
             split_screen = next((s for s in screens if isinstance(s, ItemSplitScreen)), None)
@@ -662,7 +662,7 @@ class TestTUISplitTransaction:
             await pilot.press("x")
             await pilot.pause()
 
-            from src.tui.screens import ItemSplitScreen
+            from ynab_tui.tui.screens import ItemSplitScreen
 
             screens = tui_app_with_multi_item_amazon.screen_stack
             split_screen = next((s for s in screens if isinstance(s, ItemSplitScreen)), None)
@@ -697,7 +697,7 @@ class TestTUISplitTransaction:
             await pilot.press("x")
             await pilot.pause()
 
-            from src.tui.screens import ItemSplitScreen
+            from ynab_tui.tui.screens import ItemSplitScreen
 
             screens = tui_app_with_multi_item_amazon.screen_stack
             split_screen = next((s for s in screens if isinstance(s, ItemSplitScreen)), None)
@@ -736,7 +736,7 @@ class TestTUISplitTransaction:
         """Test that reopening a synced split (from YNAB) shows items as already categorized."""
         from datetime import datetime
 
-        from src.models.transaction import SubTransaction, Transaction
+        from ynab_tui.models.transaction import SubTransaction, Transaction
 
         # Create a parent transaction marked as split with subtransactions
         parent_txn = Transaction(
@@ -836,7 +836,7 @@ class TestTUISettings:
             await pilot.pause()
 
             # Verify settings screen is showing
-            from src.tui.screens import SettingsScreen
+            from ynab_tui.tui.screens import SettingsScreen
 
             screens = tui_app.screen_stack
             assert any(isinstance(s, SettingsScreen) for s in screens)
@@ -855,7 +855,7 @@ class TestTUISettings:
             await pilot.pause()
 
             # Settings screen should be closed
-            from src.tui.screens import SettingsScreen
+            from ynab_tui.tui.screens import SettingsScreen
 
             screens = tui_app.screen_stack
             assert not any(isinstance(s, SettingsScreen) for s in screens)
@@ -912,7 +912,7 @@ class TestTUIFuzzySearch:
             await pilot.pause()
 
             # Verify search modal is showing
-            from src.tui.modals import TransactionSearchModal
+            from ynab_tui.tui.modals import TransactionSearchModal
 
             screens = tui_app.screen_stack
             # If there are transactions, modal should open
@@ -934,7 +934,7 @@ class TestTUIFuzzySearch:
                 await pilot.pause()
 
                 # Modal should be closed
-                from src.tui.modals import TransactionSearchModal
+                from ynab_tui.tui.modals import TransactionSearchModal
 
                 screens = tui_app.screen_stack
                 assert not any(isinstance(s, TransactionSearchModal) for s in screens)
@@ -1173,7 +1173,7 @@ class TestTransactionListItemDisplay:
 
     def test_format_row_transfer_transaction(self):
         """Test transfer transaction shows -> Target Account."""
-        from src.tui.app import TransactionListItem
+        from ynab_tui.tui.app import TransactionListItem
 
         # is_transfer is a property that checks transfer_account_id is not None
         txn = Transaction(
@@ -1195,7 +1195,7 @@ class TestTransactionListItemDisplay:
 
     def test_format_row_balance_adjustment(self):
         """Test balance adjustment shows (Balance Adj)."""
-        from src.tui.app import TransactionListItem
+        from ynab_tui.tui.app import TransactionListItem
 
         # is_balance_adjustment is a property that checks payee_name in BALANCE_ADJUSTMENT_PAYEES
         txn = Transaction(
@@ -1215,7 +1215,7 @@ class TestTransactionListItemDisplay:
 
     def test_format_row_cleared_status(self):
         """Test cleared transaction shows C status flag."""
-        from src.tui.app import TransactionListItem
+        from ynab_tui.tui.app import TransactionListItem
 
         txn = Transaction(
             id="txn-cleared-001",
@@ -1236,7 +1236,7 @@ class TestTransactionListItemDisplay:
 
     def test_format_row_reconciled_status(self):
         """Test reconciled transaction shows R status flag."""
-        from src.tui.app import TransactionListItem
+        from ynab_tui.tui.app import TransactionListItem
 
         txn = Transaction(
             id="txn-reconciled-001",
@@ -1257,7 +1257,7 @@ class TestTransactionListItemDisplay:
 
     def test_format_row_amazon_items(self):
         """Test Amazon transaction shows items on separate lines."""
-        from src.tui.app import TransactionListItem
+        from ynab_tui.tui.app import TransactionListItem
 
         txn = Transaction(
             id="txn-amazon-001",
@@ -1281,7 +1281,7 @@ class TestTransactionListItemDisplay:
 
     def test_format_row_pending_status(self):
         """Test pending push transaction shows P status flag."""
-        from src.tui.app import TransactionListItem
+        from ynab_tui.tui.app import TransactionListItem
 
         txn = Transaction(
             id="txn-pending-001",
@@ -1301,7 +1301,7 @@ class TestTransactionListItemDisplay:
 
     def test_format_row_tagged_indicator(self):
         """Test tagged transaction shows green star."""
-        from src.tui.app import TransactionListItem
+        from ynab_tui.tui.app import TransactionListItem
 
         txn = Transaction(
             id="txn-tagged-001",
@@ -1322,7 +1322,7 @@ class TestTransactionListItemDisplay:
 
     def test_update_content_changes_class(self):
         """Test update_content changes CSS class based on state."""
-        from src.tui.app import TransactionListItem
+        from ynab_tui.tui.app import TransactionListItem
 
         txn = Transaction(
             id="txn-update-001",
@@ -1478,7 +1478,7 @@ class TestBudgetSwitching:
             await pilot.pause()
 
             # Check if budget picker modal is showing
-            from src.tui.modals import BudgetPickerModal
+            from ynab_tui.tui.modals import BudgetPickerModal
 
             screens = tui_app.screen_stack
             has_budget_picker = any(isinstance(s, BudgetPickerModal) for s in screens)
@@ -1504,7 +1504,7 @@ class TestBudgetSwitching:
             await pilot.pause()
 
             # Should be back to main screen
-            from src.tui.modals import BudgetPickerModal
+            from ynab_tui.tui.modals import BudgetPickerModal
 
             screens = tui_app.screen_stack
             assert not any(isinstance(s, BudgetPickerModal) for s in screens)
@@ -1515,7 +1515,7 @@ class TestNavigationMixin:
 
     def test_cursor_down_at_end_stays_at_end(self):
         """Test cursor_down at last item doesn't go past end."""
-        from src.tui.mixins import NavigationMixin
+        from ynab_tui.tui.mixins import NavigationMixin
 
         class MockNavWidget(NavigationMixin):
             def __init__(self):
@@ -1544,7 +1544,7 @@ class TestNavigationMixin:
 
     def test_cursor_up_at_start_stays_at_start(self):
         """Test cursor_up at first item doesn't go negative."""
-        from src.tui.mixins import NavigationMixin
+        from ynab_tui.tui.mixins import NavigationMixin
 
         class MockNavWidget(NavigationMixin):
             def __init__(self):
@@ -1573,7 +1573,7 @@ class TestNavigationMixin:
 
     def test_scroll_home_goes_to_zero(self):
         """Test scroll_home sets index to 0."""
-        from src.tui.mixins import NavigationMixin
+        from ynab_tui.tui.mixins import NavigationMixin
 
         class MockNavWidget(NavigationMixin):
             def __init__(self):
@@ -1600,7 +1600,7 @@ class TestNavigationMixin:
 
     def test_scroll_end_goes_to_last(self):
         """Test scroll_end sets index to count-1."""
-        from src.tui.mixins import NavigationMixin
+        from ynab_tui.tui.mixins import NavigationMixin
 
         class MockNavWidget(NavigationMixin):
             def __init__(self):
@@ -1627,7 +1627,7 @@ class TestNavigationMixin:
 
     def test_half_page_down_boundary(self):
         """Test half_page_down near end stops at end."""
-        from src.tui.mixins import NavigationMixin
+        from ynab_tui.tui.mixins import NavigationMixin
 
         class MockNavWidget(NavigationMixin):
             HALF_PAGE_SIZE = 10
@@ -1657,7 +1657,7 @@ class TestNavigationMixin:
 
     def test_half_page_up_boundary(self):
         """Test half_page_up near start stops at 0."""
-        from src.tui.mixins import NavigationMixin
+        from ynab_tui.tui.mixins import NavigationMixin
 
         class MockNavWidget(NavigationMixin):
             HALF_PAGE_SIZE = 10
@@ -1687,7 +1687,7 @@ class TestNavigationMixin:
 
     def test_page_down_boundary(self):
         """Test page_down near end stops at end."""
-        from src.tui.mixins import NavigationMixin
+        from ynab_tui.tui.mixins import NavigationMixin
 
         class MockNavWidget(NavigationMixin):
             FULL_PAGE_SIZE = 20
@@ -1715,7 +1715,7 @@ class TestNavigationMixin:
 
     def test_page_up_boundary(self):
         """Test page_up near start stops at 0."""
-        from src.tui.mixins import NavigationMixin
+        from ynab_tui.tui.mixins import NavigationMixin
 
         class MockNavWidget(NavigationMixin):
             FULL_PAGE_SIZE = 20
@@ -1781,7 +1781,7 @@ class TestSearchSelection:
                 await pilot.pause()
 
                 # Search modal should be closed
-                from src.tui.modals import TransactionSearchModal
+                from ynab_tui.tui.modals import TransactionSearchModal
 
                 screens = tui_app.screen_stack
                 assert not any(isinstance(s, TransactionSearchModal) for s in screens)
@@ -1800,7 +1800,7 @@ class TestSettingsScreenNavigation:
             await pilot.pause()
 
             # Check if settings screen is active
-            from src.tui.screens import SettingsScreen
+            from ynab_tui.tui.screens import SettingsScreen
 
             screens = tui_app.screen_stack
             has_settings = any(isinstance(s, SettingsScreen) for s in screens)
@@ -1937,7 +1937,7 @@ class TestVersionAndFormatting:
 
     def test_version_available(self):
         """Test __version__ is available from package."""
-        from src import __version__
+        from ynab_tui import __version__
 
         assert isinstance(__version__, str)
         assert len(__version__) > 0
@@ -1946,14 +1946,14 @@ class TestVersionAndFormatting:
 
     def test_format_sync_time_none(self):
         """Test _format_sync_time handles None."""
-        from src.tui.app import _format_sync_time
+        from ynab_tui.tui.app import _format_sync_time
 
         result = _format_sync_time(None)
         assert result == "Never"
 
     def test_format_sync_time_with_datetime(self):
         """Test _format_sync_time formats datetime."""
-        from src.tui.app import _format_sync_time
+        from ynab_tui.tui.app import _format_sync_time
 
         result = _format_sync_time(datetime(2025, 1, 15, 10, 30))
         assert "2025-01-15" in result
@@ -2004,7 +2004,7 @@ class TestCategorizeActionComplete:
             await pilot.pause()
 
             # Check if modal opened
-            from src.tui.modals import CategoryPickerModal
+            from ynab_tui.tui.modals import CategoryPickerModal
 
             screens = tui_app_with_uncategorized.screen_stack
             picker = next((s for s in screens if isinstance(s, CategoryPickerModal)), None)
@@ -2033,7 +2033,7 @@ class TestCategorizeActionComplete:
             await pilot.press("c")
             await pilot.pause()
 
-            from src.tui.modals import CategoryPickerModal
+            from ynab_tui.tui.modals import CategoryPickerModal
 
             screens = tui_app_with_uncategorized.screen_stack
             picker = next((s for s in screens if isinstance(s, CategoryPickerModal)), None)
@@ -2228,7 +2228,7 @@ class TestMemoEditActionComplete:
             await pilot.pause()
 
             # Check if modal opened
-            from src.tui.modals import MemoEditModal
+            from ynab_tui.tui.modals import MemoEditModal
 
             screens = tui_app_for_memo.screen_stack
             modal = next((s for s in screens if isinstance(s, MemoEditModal)), None)
@@ -2255,7 +2255,7 @@ class TestMemoEditActionComplete:
 
             from textual.widgets import Input
 
-            from src.tui.modals import MemoEditModal
+            from ynab_tui.tui.modals import MemoEditModal
 
             screens = tui_app_for_memo.screen_stack
             modal = next((s for s in screens if isinstance(s, MemoEditModal)), None)
@@ -2382,7 +2382,7 @@ class TestFilterCallbacksComplete:
             await pilot.pause()
 
             # Check if modal opened
-            from src.tui.modals import CategoryFilterModal
+            from ynab_tui.tui.modals import CategoryFilterModal
 
             screens = tui_app.screen_stack
             modal = next((s for s in screens if isinstance(s, CategoryFilterModal)), None)
@@ -2414,7 +2414,7 @@ class TestFilterCallbacksComplete:
             await pilot.pause()
 
             # Check if modal opened
-            from src.tui.modals import PayeeFilterModal
+            from ynab_tui.tui.modals import PayeeFilterModal
 
             screens = tui_app.screen_stack
             modal = next((s for s in screens if isinstance(s, PayeeFilterModal)), None)
@@ -2470,7 +2470,7 @@ class TestSearchNavigation:
             await pilot.press("/")
             await pilot.pause()
 
-            from src.tui.modals import TransactionSearchModal
+            from ynab_tui.tui.modals import TransactionSearchModal
 
             screens = tui_app.screen_stack
             modal = next((s for s in screens if isinstance(s, TransactionSearchModal)), None)
@@ -2507,7 +2507,7 @@ class TestHelperMethods:
 
     async def test_get_filter_display_label(self, tui_app):
         """Test _get_filter_display_label returns correct labels."""
-        from src.tui.state import FilterState
+        from ynab_tui.tui.state import FilterState
 
         async with tui_app.run_test() as pilot:
             await pilot.pause()

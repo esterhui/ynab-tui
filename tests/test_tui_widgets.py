@@ -8,7 +8,7 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.containers import Container
 
-from src.tui.widgets.category_picker import CategoryPicker
+from ynab_tui.tui.widgets.category_picker import CategoryPicker
 
 
 @pytest.fixture

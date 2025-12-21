@@ -42,7 +42,7 @@ dev = [
 ]
 
 [project.scripts]
-ynab-tui = "src.main:main"
+ynab-tui = "ynab_tui.main:main"
 
 [project.urls]
 Repository = "https://github.com/esterhui/ynab-tui"
@@ -70,11 +70,11 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.coverage.run]
-source = ["src"]
+source = ["ynab_tui"]
 omit = [
-    "src/mock_data/*",
-    "src/clients/ynab_client.py",
-    "src/clients/amazon_client.py",
+    "ynab_tui/mock_data/*",
+    "ynab_tui/clients/ynab_client.py",
+    "ynab_tui/clients/amazon_client.py",
 ]
 
 [tool.coverage.report]
@@ -97,11 +97,11 @@ ignore_missing_imports = true
 no_implicit_optional = true
 strict_equality = true
 warn_redundant_casts = true
-exclude = ["tests/", "tests-old/", "src/mock_data/"]
+exclude = ["tests/", "tests-old/", "ynab_tui/mock_data/"]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["ynab_tui"]

@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from src.config import (
+from ynab_tui.config import (
     AmazonConfig,
     CategorizationConfig,
     Config,
@@ -19,8 +19,8 @@ from src.config import (
     YNABConfig,
     load_config,
 )
-from src.db.database import AmazonOrderCache, Database
-from src.models import (
+from ynab_tui.db.database import AmazonOrderCache, Database
+from ynab_tui.models import (
     AmazonOrder,
     Category,
     CategoryGroup,
@@ -29,7 +29,7 @@ from src.models import (
     SubTransaction,
     Transaction,
 )
-from src.services.matching import TransactionInfo
+from ynab_tui.services.matching import TransactionInfo
 
 # =============================================================================
 # Factory Functions (for use in tests that need to create many objects)
@@ -520,7 +520,7 @@ def sample_orders() -> list[AmazonOrderCache]:
 @pytest.fixture(scope="session")
 def mock_ynab_client():
     """Create mock YNAB client once for entire test session."""
-    from src.clients import MockYNABClient
+    from ynab_tui.clients import MockYNABClient
 
     return MockYNABClient(max_transactions=100)
 
@@ -528,7 +528,7 @@ def mock_ynab_client():
 @pytest.fixture(scope="session")
 def mock_amazon_client():
     """Create mock Amazon client once for entire test session."""
-    from src.clients import MockAmazonClient
+    from ynab_tui.clients import MockAmazonClient
 
     return MockAmazonClient()
 
@@ -553,7 +553,7 @@ def mock_amazon_repo_with_orders(sample_orders: list[AmazonOrderCache]) -> MockA
 @pytest.fixture
 def sync_service(database, mock_ynab_client, mock_amazon_client):
     """Create SyncService with mock clients and temp database."""
-    from src.services.sync import SyncService
+    from ynab_tui.services.sync import SyncService
 
     return SyncService(
         db=database,
@@ -565,7 +565,7 @@ def sync_service(database, mock_ynab_client, mock_amazon_client):
 @pytest.fixture
 def categorizer_service(database, sample_config, mock_ynab_client):
     """Create a CategorizerService with mock clients."""
-    from src.services.categorizer import CategorizerService
+    from ynab_tui.services.categorizer import CategorizerService
 
     return CategorizerService(
         config=sample_config,
@@ -577,7 +577,7 @@ def categorizer_service(database, sample_config, mock_ynab_client):
 @pytest.fixture
 def category_mapping_service(database):
     """Create a CategoryMappingService instance."""
-    from src.services.category_mapping import CategoryMappingService
+    from ynab_tui.services.category_mapping import CategoryMappingService
 
     return CategoryMappingService(database)
 
@@ -585,7 +585,7 @@ def category_mapping_service(database):
 @pytest.fixture
 def amazon_order_matcher(database):
     """Create an AmazonOrderMatcher instance."""
-    from src.services.amazon_matcher import AmazonOrderMatcher
+    from ynab_tui.services.amazon_matcher import AmazonOrderMatcher
 
     return AmazonOrderMatcher(database)
 
@@ -593,7 +593,7 @@ def amazon_order_matcher(database):
 @pytest.fixture
 def transaction_matcher(database, sample_config):
     """Create a TransactionMatcher instance."""
-    from src.services.matcher import TransactionMatcher
+    from ynab_tui.services.matcher import TransactionMatcher
 
     return TransactionMatcher(
         db=database,

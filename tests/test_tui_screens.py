@@ -8,11 +8,11 @@ import pytest
 from textual.app import App, ComposeResult
 from textual.widgets import Static
 
-from src.clients import MockYNABClient
-from src.db.database import Database
-from src.models import Transaction
-from src.services.categorizer import CategorizerService
-from src.tui.screens.item_split import ItemSplitScreen, SplitItemListItem
+from ynab_tui.clients import MockYNABClient
+from ynab_tui.db.database import Database
+from ynab_tui.models import Transaction
+from ynab_tui.services.categorizer import CategorizerService
+from ynab_tui.tui.screens.item_split import ItemSplitScreen, SplitItemListItem
 
 
 @pytest.fixture
@@ -562,7 +562,7 @@ class TestSettingsScreen:
 
     async def test_settings_screen_mounts(self, settings_config):
         """Test settings screen mounts without crashing."""
-        from src.tui.screens.settings import SettingsScreen
+        from ynab_tui.tui.screens.settings import SettingsScreen
 
         screen = SettingsScreen(config=settings_config)
         app = ScreenTestApp(screen)
@@ -576,7 +576,7 @@ class TestSettingsScreen:
 
     async def test_settings_screen_displays_config(self, settings_config):
         """Test settings screen displays configuration values."""
-        from src.tui.screens.settings import SettingsScreen
+        from ynab_tui.tui.screens.settings import SettingsScreen
 
         screen = SettingsScreen(config=settings_config)
         app = ScreenTestApp(screen)
@@ -590,7 +590,7 @@ class TestSettingsScreen:
 
     async def test_settings_screen_quit_action(self, settings_config):
         """Test 'q' key closes settings screen."""
-        from src.tui.screens.settings import SettingsScreen
+        from ynab_tui.tui.screens.settings import SettingsScreen
 
         screen = SettingsScreen(config=settings_config)
         app = ScreenTestApp(screen)
@@ -603,7 +603,7 @@ class TestSettingsScreen:
 
     def test_mask_token_empty(self, settings_config):
         """Test _mask_token with empty token."""
-        from src.tui.screens.settings import SettingsScreen
+        from ynab_tui.tui.screens.settings import SettingsScreen
 
         screen = SettingsScreen(config=settings_config)
         result = screen._mask_token("")
@@ -611,7 +611,7 @@ class TestSettingsScreen:
 
     def test_mask_token_short(self, settings_config):
         """Test _mask_token with short token."""
-        from src.tui.screens.settings import SettingsScreen
+        from ynab_tui.tui.screens.settings import SettingsScreen
 
         screen = SettingsScreen(config=settings_config)
         result = screen._mask_token("abcd")
@@ -619,7 +619,7 @@ class TestSettingsScreen:
 
     def test_mask_token_long(self, settings_config):
         """Test _mask_token with long token."""
-        from src.tui.screens.settings import SettingsScreen
+        from ynab_tui.tui.screens.settings import SettingsScreen
 
         screen = SettingsScreen(config=settings_config)
         result = screen._mask_token("abcd1234efgh5678")
@@ -629,7 +629,7 @@ class TestSettingsScreen:
 
     def test_mask_email_empty(self, settings_config):
         """Test _mask_email with empty email."""
-        from src.tui.screens.settings import SettingsScreen
+        from ynab_tui.tui.screens.settings import SettingsScreen
 
         screen = SettingsScreen(config=settings_config)
         result = screen._mask_email("")
@@ -637,7 +637,7 @@ class TestSettingsScreen:
 
     def test_mask_email_no_at(self, settings_config):
         """Test _mask_email without @ symbol."""
-        from src.tui.screens.settings import SettingsScreen
+        from ynab_tui.tui.screens.settings import SettingsScreen
 
         screen = SettingsScreen(config=settings_config)
         result = screen._mask_email("username")
@@ -646,7 +646,7 @@ class TestSettingsScreen:
 
     def test_mask_email_valid(self, settings_config):
         """Test _mask_email with valid email."""
-        from src.tui.screens.settings import SettingsScreen
+        from ynab_tui.tui.screens.settings import SettingsScreen
 
         screen = SettingsScreen(config=settings_config)
         result = screen._mask_email("test@example.com")
@@ -654,7 +654,7 @@ class TestSettingsScreen:
 
     def test_mask_email_short_username(self, settings_config):
         """Test _mask_email with short username."""
-        from src.tui.screens.settings import SettingsScreen
+        from ynab_tui.tui.screens.settings import SettingsScreen
 
         screen = SettingsScreen(config=settings_config)
         result = screen._mask_email("ab@example.com")
@@ -662,7 +662,7 @@ class TestSettingsScreen:
 
     async def test_settings_save_button(self, settings_config):
         """Test save button functionality."""
-        from src.tui.screens.settings import SettingsScreen
+        from ynab_tui.tui.screens.settings import SettingsScreen
 
         screen = SettingsScreen(config=settings_config)
         app = ScreenTestApp(screen)
@@ -678,7 +678,7 @@ class TestSettingsScreen:
 
     async def test_settings_close_button(self, settings_config):
         """Test close button functionality."""
-        from src.tui.screens.settings import SettingsScreen
+        from ynab_tui.tui.screens.settings import SettingsScreen
 
         screen = SettingsScreen(config=settings_config)
         app = ScreenTestApp(screen)

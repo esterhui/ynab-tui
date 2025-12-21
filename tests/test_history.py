@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.services.history import HistoryService, PayeePattern
+from ynab_tui.services.history import HistoryService, PayeePattern
 
 
 @pytest.fixture

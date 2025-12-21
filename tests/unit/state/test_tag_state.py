@@ -7,8 +7,8 @@ from datetime import datetime
 
 import pytest
 
-from src.models import Transaction
-from src.tui.state import TagManager, TagState, TransactionSelector
+from ynab_tui.models import Transaction
+from ynab_tui.tui.state import TagManager, TagState, TransactionSelector
 
 
 def make_test_transaction(id: str = "txn-1") -> Transaction:

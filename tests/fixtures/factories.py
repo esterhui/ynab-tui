@@ -7,8 +7,8 @@ making them importable from any test file.
 from datetime import datetime
 from typing import Any
 
-from src.db.database import AmazonOrderCache
-from src.services.matching import TransactionInfo
+from ynab_tui.db.database import AmazonOrderCache
+from ynab_tui.services.matching import TransactionInfo
 
 
 def make_transaction_info(

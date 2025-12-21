@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.cli.formatters import (
+from ynab_tui.cli.formatters import (
     display_amazon_match_results,
     display_verbose_items,
     echo_error,
@@ -19,10 +19,10 @@ from src.cli.formatters import (
     format_sync_time,
     format_transaction_row,
 )
-from src.db.database import AmazonOrderCache
-from src.services.amazon_matcher import AmazonMatchResult, TransactionInfo
-from src.services.category_mapping import ItemCategoryPrediction, OrderCategoryPrediction
-from src.services.sync import PullResult, PushResult
+from ynab_tui.db.database import AmazonOrderCache
+from ynab_tui.services.amazon_matcher import AmazonMatchResult, TransactionInfo
+from ynab_tui.services.category_mapping import ItemCategoryPrediction, OrderCategoryPrediction
+from ynab_tui.services.sync import PullResult, PushResult
 
 
 class TestFormatSyncTime:

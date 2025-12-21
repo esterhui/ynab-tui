@@ -10,7 +10,7 @@ from ..models import TransactionFilter
 from .base import CountMixin, _date_str, _now_iso
 
 if TYPE_CHECKING:
-    from src.models.transaction import SubTransaction, Transaction
+    from ynab_tui.models.transaction import SubTransaction, Transaction
 
 
 class TransactionMixin(CountMixin):
@@ -217,7 +217,7 @@ class TransactionMixin(CountMixin):
         Returns:
             List of SQL WHERE conditions.
         """
-        from src.models.transaction import BALANCE_ADJUSTMENT_PAYEES
+        from ynab_tui.models.transaction import BALANCE_ADJUSTMENT_PAYEES
 
         prefix = f"{table_alias}." if table_alias else ""
         payees_sql = ", ".join(f"'{p}'" for p in BALANCE_ADJUSTMENT_PAYEES)

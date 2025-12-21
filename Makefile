@@ -23,14 +23,14 @@ help:
 	@echo "  make db-status  - Show database sync status"
 	@echo ""
 	@echo "CLI examples:"
-	@echo "  uv run python -m src.main                     # Launch TUI"
-	@echo "  uv run python -m src.main amazon-match        # Match Amazon transactions"
-	@echo "  uv run python -m src.main uncategorized       # List uncategorized transactions"
-	@echo "  uv run python -m src.main --help              # Show all commands"
+	@echo "  uv run python -m ynab_tui.main                     # Launch TUI"
+	@echo "  uv run python -m ynab_tui.main amazon-match        # Match Amazon transactions"
+	@echo "  uv run python -m ynab_tui.main uncategorized       # List uncategorized transactions"
+	@echo "  uv run python -m ynab_tui.main --help              # Show all commands"
 	@echo ""
 	@echo "Mock mode (no live APIs):"
-	@echo "  uv run python -m src.main --mock              # Launch TUI with mock data"
-	@echo "  uv run python -m src.main --mock db-clear     # Only clears mock DB"
+	@echo "  uv run python -m ynab_tui.main --mock              # Launch TUI with mock data"
+	@echo "  uv run python -m ynab_tui.main --mock db-clear     # Only clears mock DB"
 	@echo ""
 	@echo "Release (use the release script):"
 	@echo "  ./scripts/release.py 0.2.0           # Full release"
@@ -42,41 +42,41 @@ install:
 	uv sync --all-extras
 
 run:
-	uv run python -m src.main
+	uv run python -m ynab_tui.main
 
 test:
 	uv run pytest tests/ -n auto -q
 
 coverage:
-	uv run pytest tests/ --cov=src --cov-report=html --cov-report=term-missing
+	uv run pytest tests/ --cov=ynab_tui --cov-report=html --cov-report=term-missing
 
 sloc:
-	scc -a -x csv,toml  src/ tests/
+	scc -a -x csv,toml  ynab_tui/ tests/
 
 sloc-src:
-	scc -a -x csv,toml  src/
+	scc -a -x csv,toml  ynab_tui/
 
 
 check:
-	uv run ruff format src/ tests/
-	uv run ruff check --fix src/ tests/
-	uv run mypy src/
+	uv run ruff format ynab_tui/ tests/
+	uv run ruff check --fix ynab_tui/ tests/
+	uv run mypy ynab_tui/
 
 format:
-	uv run ruff format src/ tests/
-	uv run ruff check --fix src/ tests/
+	uv run ruff format ynab_tui/ tests/
+	uv run ruff check --fix ynab_tui/ tests/
 
 mock-data:
 	@echo "Generating synthetic mock data..."
-	uv run python src/mock_data/generate_mock_data.py
+	uv run python ynab_tui/mock_data/generate_mock_data.py
 
 mock-prod-data:
 	@echo "Exporting production database to mock CSV files..."
 	@echo "Note: Run 'make pull' first to sync data from live APIs."
-	uv run python -m src.main db-transactions --year 2025 --csv src/mock_data/transactions.csv
-	uv run python -m src.main ynab-categories --csv src/mock_data/categories.csv
-	uv run python -m src.main db-amazon-orders --year 2025 --csv src/mock_data/orders.csv
-	@echo "Production data exported to src/mock_data/"
+	uv run python -m ynab_tui.main db-transactions --year 2025 --csv ynab_tui/mock_data/transactions.csv
+	uv run python -m ynab_tui.main ynab-categories --csv ynab_tui/mock_data/categories.csv
+	uv run python -m ynab_tui.main db-amazon-orders --year 2025 --csv ynab_tui/mock_data/orders.csv
+	@echo "Production data exported to ynab_tui/mock_data/"
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
@@ -86,19 +86,19 @@ clean:
 
 # Sync commands (git-style)
 pull:
-	uv run python -m src.main pull
+	uv run python -m ynab_tui.main pull
 
 pull-full:
-	uv run python -m src.main pull --full
+	uv run python -m ynab_tui.main pull --full
 
 push:
-	uv run python -m src.main push
+	uv run python -m ynab_tui.main push
 
 push-dry:
-	uv run python -m src.main push --dry-run
+	uv run python -m ynab_tui.main push --dry-run
 
 db-status:
-	uv run python -m src.main db-status
+	uv run python -m ynab_tui.main db-status
 
 # Release commands
 build:

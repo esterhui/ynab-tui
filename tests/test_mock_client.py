@@ -5,8 +5,8 @@ from datetime import datetime
 
 import pytest
 
-from src.clients.mock_ynab_client import MockYNABClient
-from src.clients.ynab_client import YNABClientError
+from ynab_tui.clients.mock_ynab_client import MockYNABClient
+from ynab_tui.clients.ynab_client import YNABClientError
 
 
 @pytest.fixture

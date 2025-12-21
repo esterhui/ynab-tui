@@ -23,24 +23,24 @@ YNAB TUI is a transaction categorization tool for YNAB (You Need A Budget). It h
 uv sync --all-extras
 
 # Run the TUI application
-uv run python -m src.main
-uv run python -m src.main --mock            # Mock mode (no credentials needed)
+uv run python -m ynab_tui.main
+uv run python -m ynab_tui.main --mock            # Mock mode (no credentials needed)
 
 # Sync commands (git-style pull/push)
-uv run python -m src.main pull              # Incremental pull from YNAB + Amazon
-uv run python -m src.main pull --full       # Full pull of all data
-uv run python -m src.main push              # Push local categorizations to YNAB
-uv run python -m src.main push --dry-run    # Preview what would be pushed
+uv run python -m ynab_tui.main pull              # Incremental pull from YNAB + Amazon
+uv run python -m ynab_tui.main pull --full       # Full pull of all data
+uv run python -m ynab_tui.main push              # Push local categorizations to YNAB
+uv run python -m ynab_tui.main push --dry-run    # Preview what would be pushed
 
 # Database commands
-uv run python -m src.main db-status         # Show sync status and statistics
-uv run python -m src.main db-transactions --uncategorized  # List uncategorized
-uv run python -m src.main db-amazon-orders --year 2024     # List orders by year
+uv run python -m ynab_tui.main db-status         # Show sync status and statistics
+uv run python -m ynab_tui.main db-transactions --uncategorized  # List uncategorized
+uv run python -m ynab_tui.main db-amazon-orders --year 2024     # List orders by year
 
 # Testing commands
-uv run python -m src.main ynab-test         # Test YNAB API connection
-uv run python -m src.main amazon-test       # Test Amazon connection
-uv run python -m src.main amazon-match      # Match Amazon transactions to orders
+uv run python -m ynab_tui.main ynab-test         # Test YNAB API connection
+uv run python -m ynab_tui.main amazon-test       # Test Amazon connection
+uv run python -m ynab_tui.main amazon-match      # Match Amazon transactions to orders
 
 # Run tests
 uv run pytest tests/ -v                     # All tests
@@ -49,8 +49,8 @@ uv run pytest tests/test_matcher.py::test_name -v  # Single test
 uv run pytest tests/ -n auto -q             # Parallel execution (faster)
 
 # Lint and format
-uv run ruff check src/ tests/
-uv run ruff format src/ tests/
+uv run ruff check ynab_tui/ tests/
+uv run ruff format ynab_tui/ tests/
 ```
 
 ## Architecture
@@ -80,25 +80,25 @@ YNAB API ──pull──→ Local SQLite DB ←──pull── Amazon Orders
 
 ### Core Components
 
-**CategorizerService** (`src/services/categorizer.py`): Main orchestrator. Entry point for transaction operations, category application, and undo.
+**CategorizerService** (`ynab_tui/services/categorizer.py`): Main orchestrator. Entry point for transaction operations, category application, and undo.
 
-**TransactionMatcher** (`src/services/matcher.py`): Identifies Amazon transactions by payee patterns, matches to orders by amount (±$0.10) and date (two-stage: 7-day strict, 24-day extended).
+**TransactionMatcher** (`ynab_tui/services/matcher.py`): Identifies Amazon transactions by payee patterns, matches to orders by amount (±$0.10) and date (two-stage: 7-day strict, 24-day extended).
 
-**SyncService** (`src/services/sync.py`): Git-style pull/push:
+**SyncService** (`ynab_tui/services/sync.py`): Git-style pull/push:
 - `pull_ynab()`: Downloads transactions (incremental with 7-day overlap)
 - `pull_amazon()`: Downloads Amazon orders
 - `push_ynab()`: Uploads pending changes to YNAB
 
-**Database** (`src/db/database.py`): SQLite with mixin architecture:
+**Database** (`ynab_tui/db/database.py`): SQLite with mixin architecture:
 - `TransactionMixin`: YNAB transaction CRUD
 - `AmazonMixin`: Amazon orders and items cache
 - `PendingChangesMixin`: Delta table for undo support
 - `HistoryMixin`: Categorization learning history
 - `SyncMixin`: Sync state tracking
 
-**Clients** (`src/clients/`):
+**Clients** (`ynab_tui/clients/`):
 - `YNABClient`: Wraps `ynab` SDK. **YNAB amounts are in milliunits (1000 = $1.00)**
-- `MockYNABClient`: Loads from CSV files in `src/mock_data/` for offline testing
+- `MockYNABClient`: Loads from CSV files in `ynab_tui/mock_data/` for offline testing
 - `AmazonClient`: Scrapes order history via `amazon-orders` library
 
 ### Key Tables
@@ -124,7 +124,7 @@ Config from `~/.config/ynab-tui/config.toml` with env var overrides:
 
 ### TUI Keybindings
 
-Vim-style navigation in `src/tui/app.py`:
+Vim-style navigation in `ynab_tui/tui/app.py`:
 - `j/k` or arrows: Navigate
 - `g/G`: Top/bottom
 - `c`: Categorize, `a`: Approve, `x`: Split, `u`: Undo
@@ -141,7 +141,7 @@ Vim-style navigation in `src/tui/app.py`:
 
 **Historical Learning**: Categorization decisions are recorded for pattern-based suggestions.
 
-**Testing**: Use `--mock` flag for offline testing. Mock clients load from `src/mock_data/*.csv`. Tests use `pytest-asyncio` for TUI testing and fixtures in `tests/conftest.py`.
+**Testing**: Use `--mock` flag for offline testing. Mock clients load from `ynab_tui/mock_data/*.csv`. Tests use `pytest-asyncio` for TUI testing and fixtures in `tests/conftest.py`.
 
 ## Dev Notes
 

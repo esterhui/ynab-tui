@@ -1,6 +1,6 @@
 """Transaction search modal using FuzzySelectModal base."""
 
-from src.models.transaction import Transaction
+from ynab_tui.models.transaction import Transaction
 
 from .fuzzy_select import FuzzySelectModal
 

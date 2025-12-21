@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 import pytest
 
-from src.utils import (
+from ynab_tui.utils import (
     fuzzy_match,
     get_match_fn,
     is_amazon_payee,
@@ -14,7 +14,7 @@ from src.utils import (
     truncate_list_display,
     word_boundary_match,
 )
-from src.utils.string_utils import normalize_string
+from ynab_tui.utils.string_utils import normalize_string
 
 
 class TestParseDate:

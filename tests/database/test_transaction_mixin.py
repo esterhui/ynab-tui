@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from src.db.database import Database
-from src.db.models import TransactionFilter
-from src.models import Transaction
+from ynab_tui.db.database import Database
+from ynab_tui.db.models import TransactionFilter
+from ynab_tui.models import Transaction
 
 
 @pytest.fixture

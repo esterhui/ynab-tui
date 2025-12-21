@@ -8,8 +8,8 @@ method returns an ActionResult that the TUI can use for notifications.
 from dataclasses import dataclass
 from typing import Optional
 
-from src.models import Transaction
-from src.services.categorizer import CategorizerService
+from ynab_tui.models import Transaction
+from ynab_tui.services.categorizer import CategorizerService
 
 
 @dataclass

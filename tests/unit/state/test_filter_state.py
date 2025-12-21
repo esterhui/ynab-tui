@@ -5,7 +5,7 @@ These tests verify the pure state machine logic without Textual UI.
 
 import pytest
 
-from src.tui.state import (
+from ynab_tui.tui.state import (
     FILTER_LABELS,
     CategoryFilter,
     FilterState,

@@ -9,8 +9,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.models import Transaction
-from src.tui.handlers import ActionHandler, ActionResult
+from ynab_tui.models import Transaction
+from ynab_tui.tui.handlers import ActionHandler, ActionResult
 
 
 class TestActionResult:

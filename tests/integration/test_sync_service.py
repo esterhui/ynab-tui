@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from src.config import AmazonConfig, CategorizationConfig
-from src.db.database import Database
-from src.models import Category, CategoryGroup, CategoryList, Transaction
-from src.services.sync import PullResult, PushResult, SyncService
+from ynab_tui.config import AmazonConfig, CategorizationConfig
+from ynab_tui.db.database import Database
+from ynab_tui.models import Category, CategoryGroup, CategoryList, Transaction
+from ynab_tui.services.sync import PullResult, PushResult, SyncService
 
 
 @dataclass

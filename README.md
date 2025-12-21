@@ -153,14 +153,14 @@ Sync commands (git-style):
   make db-status  - Show database sync status
 
 CLI examples:
-  uv run python -m src.main                     # Launch TUI
-  uv run python -m src.main amazon-match        # Match Amazon transactions
-  uv run python -m src.main uncategorized       # List uncategorized transactions
-  uv run python -m src.main --help              # Show all commands
+  uv run python -m ynab_tui.main                     # Launch TUI
+  uv run python -m ynab_tui.main amazon-match        # Match Amazon transactions
+  uv run python -m ynab_tui.main uncategorized       # List uncategorized transactions
+  uv run python -m ynab_tui.main --help              # Show all commands
 
 Mock mode (no live APIs):
-  uv run python -m src.main --mock              # Launch TUI with mock data
-  uv run python -m src.main --mock db-clear     # Only clears mock DB
+  uv run python -m ynab_tui.main --mock              # Launch TUI with mock data
+  uv run python -m ynab_tui.main --mock db-clear     # Only clears mock DB
 ```
 
 ## How It Works
@@ -230,8 +230,8 @@ This makes Amazon transactions much easier to categorize accurately.
 uv run pytest tests/ -v
 
 # Lint and format
-uv run ruff check src/ tests/
-uv run ruff format src/ tests/
+uv run ruff check ynab_tui/ tests/
+uv run ruff format ynab_tui/ tests/
 
 # Run with mock data (no credentials needed)
 ynab-tui --mock

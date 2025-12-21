@@ -8,8 +8,8 @@ mocks for testing.
 from dataclasses import dataclass
 from typing import Optional
 
-from src.services.categorizer import CategorizerService
-from src.tui.handlers import ActionHandler
+from ynab_tui.services.categorizer import CategorizerService
+from ynab_tui.tui.handlers import ActionHandler
 
 
 @dataclass

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from src.db.database import AmazonOrderCache, Database
+from ynab_tui.db.database import AmazonOrderCache, Database
 
 
 @pytest.fixture

@@ -8,10 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from src.config import CategorizationConfig, Config, DisplayConfig, PayeesConfig
-from src.db.database import Database
-from src.models import CategoryGroup, CategoryList, Transaction
-from src.services.categorizer import CategorizerService
+from ynab_tui.config import CategorizationConfig, Config, DisplayConfig, PayeesConfig
+from ynab_tui.db.database import Database
+from ynab_tui.models import CategoryGroup, CategoryList, Transaction
+from ynab_tui.services.categorizer import CategorizerService
 
 
 class MockYNABClient:
@@ -226,7 +226,7 @@ class TestCategories:
     def test_loads_from_database(self, temp_db: Database, mock_ynab: MockYNABClient) -> None:
         """Categories loaded from database."""
         # Add categories to database using CategoryList
-        from src.models.category import Category, CategoryGroup, CategoryList
+        from ynab_tui.models.category import Category, CategoryGroup, CategoryList
 
         cat_list = CategoryList(
             groups=[
@@ -265,7 +265,7 @@ class TestRefreshCategories:
 
     def test_refreshes_from_database(self, temp_db: Database, mock_ynab: MockYNABClient) -> None:
         """Refreshes categories from database."""
-        from src.models.category import Category, CategoryGroup, CategoryList
+        from ynab_tui.models.category import Category, CategoryGroup, CategoryList
 
         config = make_config()
         categorizer = CategorizerService(config, mock_ynab, temp_db)
@@ -312,8 +312,8 @@ class TestGetters:
 
     def test_get_category_groups(self, temp_db: Database, mock_ynab: MockYNABClient) -> None:
         """get_category_groups returns groups."""
-        from src.models.category import Category, CategoryList
-        from src.models.category import CategoryGroup as CategoryGrp
+        from ynab_tui.models.category import Category, CategoryList
+        from ynab_tui.models.category import CategoryGroup as CategoryGrp
 
         cat_list = CategoryList(
             groups=[

@@ -8,12 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from src.config import CategorizationConfig, PayeesConfig
-from src.db.database import AmazonOrderCache, Database
-from src.models import Transaction
-from src.services.amazon_matcher import TransactionInfo
-from src.services.matcher import TransactionMatcher
-from src.services.matching import AmazonMatchResult
+from ynab_tui.config import CategorizationConfig, PayeesConfig
+from ynab_tui.db.database import AmazonOrderCache, Database
+from ynab_tui.models import Transaction
+from ynab_tui.services.amazon_matcher import TransactionInfo
+from ynab_tui.services.matcher import TransactionMatcher
+from ynab_tui.services.matching import AmazonMatchResult
 
 
 class MockAmazonMatcher:

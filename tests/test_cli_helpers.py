@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from src.cli.helpers import (
+from ynab_tui.cli.helpers import (
     display_pending_changes,
     format_date_for_display,
     require_data,

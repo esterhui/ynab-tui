@@ -7,8 +7,8 @@ from datetime import datetime
 
 import pytest
 
-from src.db.database import AmazonOrderCache
-from src.services.amazon_matcher import AmazonOrderMatcher, TransactionInfo
+from ynab_tui.db.database import AmazonOrderCache
+from ynab_tui.services.amazon_matcher import AmazonOrderMatcher, TransactionInfo
 
 
 class MockAmazonOrderRepo:
@@ -300,7 +300,7 @@ class TestMatcherWithRealDB:
     @pytest.fixture
     def matcher_with_db(self, tmp_path) -> AmazonOrderMatcher:
         """Create matcher with real temp database."""
-        from src.db.database import Database
+        from ynab_tui.db.database import Database
 
         db_path = tmp_path / "test.db"
         db = Database(str(db_path))

@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from src.db.database import Database
-from src.services.history import HistoryService, PayeePattern
+from ynab_tui.db.database import Database
+from ynab_tui.services.history import HistoryService, PayeePattern
 
 
 @pytest.fixture

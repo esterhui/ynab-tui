@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from src.db.database import Database
-from src.db.models import AmazonOrderCache
-from src.services.category_mapping import (
+from ynab_tui.db.database import Database
+from ynab_tui.db.models import AmazonOrderCache
+from ynab_tui.services.category_mapping import (
     CategoryMappingService,
     ItemCategoryPrediction,
     LearningResult,
@@ -266,7 +266,7 @@ class TestLearnFromApprovedTransactions:
         self, temp_db: Database, mapping_service: CategoryMappingService
     ) -> None:
         """Returns empty when no Amazon transactions found."""
-        from src.models import Transaction
+        from ynab_tui.models import Transaction
 
         # Add non-Amazon approved transaction
         txn = Transaction(
@@ -289,7 +289,7 @@ class TestLearnFromApprovedTransactions:
         self, temp_db: Database, mapping_service: CategoryMappingService
     ) -> None:
         """Processes approved Amazon transactions."""
-        from src.models import Transaction
+        from ynab_tui.models import Transaction
 
         # Add approved Amazon transaction
         txn = Transaction(
@@ -318,7 +318,7 @@ class TestLearnFromApprovedTransactions:
         self, temp_db: Database, mapping_service: CategoryMappingService
     ) -> None:
         """Respects since_date filter."""
-        from src.models import Transaction
+        from ynab_tui.models import Transaction
 
         # Old transaction
         old_txn = Transaction(
@@ -355,7 +355,7 @@ class TestLearnFromApprovedTransactions:
         self, temp_db: Database, mapping_service: CategoryMappingService
     ) -> None:
         """Dry run doesn't record learnings."""
-        from src.models import Transaction
+        from ynab_tui.models import Transaction
 
         txn = Transaction(
             id="txn-1",
@@ -383,7 +383,7 @@ class TestLearnFromApprovedTransactions:
         self, temp_db: Database, mapping_service: CategoryMappingService
     ) -> None:
         """Skips transactions without category."""
-        from src.models import Transaction
+        from ynab_tui.models import Transaction
 
         # Approved but uncategorized
         txn = Transaction(
@@ -411,7 +411,7 @@ class TestLearnFromNonSplit:
         self, temp_db: Database, mapping_service: CategoryMappingService
     ) -> None:
         """Learns from all items in order."""
-        from src.services.amazon_matcher import TransactionInfo
+        from ynab_tui.services.amazon_matcher import TransactionInfo
 
         temp_db.cache_amazon_order("order-1", datetime(2025, 11, 24), 100.0)
         temp_db.upsert_amazon_order_items(
@@ -450,7 +450,7 @@ class TestLearnFromNonSplit:
         self, temp_db: Database, mapping_service: CategoryMappingService
     ) -> None:
         """Reports items without category."""
-        from src.services.amazon_matcher import TransactionInfo
+        from ynab_tui.services.amazon_matcher import TransactionInfo
 
         order = AmazonOrderCache(
             order_id="order-1",
@@ -478,7 +478,7 @@ class TestLearnFromNonSplit:
         self, temp_db: Database, mapping_service: CategoryMappingService
     ) -> None:
         """Skips empty item names."""
-        from src.services.amazon_matcher import TransactionInfo
+        from ynab_tui.services.amazon_matcher import TransactionInfo
 
         order = AmazonOrderCache(
             order_id="order-1",

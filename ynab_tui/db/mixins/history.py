@@ -7,7 +7,7 @@ import sqlite3
 from datetime import datetime
 from typing import Any, Optional
 
-from src.utils.string_utils import normalize_string
+from ynab_tui.utils.string_utils import normalize_string
 
 from ..models import CategorizationRecord
 from .base import CountMixin

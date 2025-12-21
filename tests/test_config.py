@@ -3,7 +3,7 @@
 import os
 from pathlib import Path
 
-from src.config import (
+from ynab_tui.config import (
     AmazonConfig,
     CategorizationConfig,
     Config,
