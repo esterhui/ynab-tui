@@ -3,6 +3,9 @@
 Provides both TUI and CLI interfaces for transaction categorization.
 """
 
+import os
+from pathlib import Path
+
 import click
 
 from . import __version__
@@ -18,6 +21,31 @@ from .clients import AmazonClient
 from .config import load_config
 from .services import CategorizerService
 from .utils import is_amazon_payee
+
+# Template for config.toml created by 'ynab-tui init'
+CONFIG_TEMPLATE = """\
+# YNAB TUI Configuration
+# Documentation: https://github.com/esterhui/ynab-tui
+
+[ynab]
+# Get your API token from https://app.ynab.com/settings/developer
+api_token = ""  # or set YNAB_API_TOKEN environment variable
+budget_id = "last-used"
+
+[amazon]
+# Amazon credentials for order history scraping (optional)
+username = ""  # or set AMAZON_USERNAME environment variable
+password = ""  # or set AMAZON_PASSWORD environment variable
+otp_secret = ""  # TOTP secret for 2FA (optional)
+
+# For all configuration options, see:
+# https://github.com/esterhui/ynab-tui/blob/main/config.example.toml
+"""
+
+
+def _has_credentials_configured(cfg) -> bool:
+    """Check if any credentials are configured (config file or env vars)."""
+    return bool(cfg.ynab.api_token)
 
 
 @click.group(invoke_without_command=True)
@@ -38,9 +66,6 @@ def main(ctx, config, budget, mock, mouse, load_since_months):
 
     Categorize YNAB transactions using Amazon order history for intelligent matching.
     """
-    # Load configuration
-    from pathlib import Path
-
     config_path = Path(config) if config else None
     cfg = load_config(config_path)
 
@@ -57,6 +82,24 @@ def main(ctx, config, budget, mock, mouse, load_since_months):
 
     # If no subcommand, launch TUI
     if ctx.invoked_subcommand is None:
+        # Show first-run guidance if no credentials configured and not in mock mode
+        if not mock and not _has_credentials_configured(cfg):
+            config_file = cfg.data_dir / "config.toml"
+            click.echo(click.style("No YNAB credentials configured.", fg="yellow"))
+            click.echo()
+            if not config_file.exists():
+                click.echo("To get started:")
+                click.echo("  1. Run: ynab-tui init")
+                click.echo(f"  2. Edit {config_file} with your YNAB API token")
+            else:
+                click.echo(f"Edit {config_file} to add your YNAB API token")
+                click.echo("Or set the YNAB_API_TOKEN environment variable")
+            click.echo()
+            click.echo("Get your API token from: https://app.ynab.com/settings/developer")
+            click.echo()
+            click.echo("To try without credentials: ynab-tui --mock")
+            return
+
         categorizer = get_categorizer(ctx)
         from .tui.app import YNABCategorizerApp
 
@@ -64,6 +107,69 @@ def main(ctx, config, budget, mock, mouse, load_since_months):
         months = load_since_months if load_since_months > 0 else None
         app = YNABCategorizerApp(categorizer, is_mock=mock, load_since_months=months)
         app.run(mouse=mouse)
+
+
+def _set_secure_permissions(path: Path) -> None:
+    """Set file permissions to owner read/write only (600)."""
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass  # Windows doesn't support chmod the same way
+
+
+@main.command("init")
+@click.option("--force", "-f", is_flag=True, help="Overwrite existing config file")
+@click.pass_context
+def init_config(ctx, force):
+    """Initialize configuration file and database.
+
+    Creates ~/.config/ynab-tui/config.toml with a template configuration
+    and initializes the database files with secure permissions.
+
+    \b
+    Examples:
+        ynab-tui init           # Create config file and databases
+        ynab-tui init --force   # Overwrite existing config
+    """
+    cfg = ctx.obj["config"]
+    config_dir = cfg.data_dir
+    config_file = config_dir / "config.toml"
+    prod_db = cfg.db_path
+    mock_db = config_dir / "mock_categorizer.db"
+
+    # Check if config already exists
+    if config_file.exists() and not force:
+        click.echo(click.style(f"Config file already exists: {config_file}", fg="yellow"))
+        click.echo("Use --force to overwrite")
+        return
+
+    # Create config directory if needed (should already exist from load_config)
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write config template with secure permissions
+    config_file.write_text(CONFIG_TEMPLATE)
+    _set_secure_permissions(config_file)
+
+    # Create database files with secure permissions if they don't exist
+    # SQLite will use these files and preserve their permissions
+    dbs_created = []
+    for db_file in [prod_db, mock_db]:
+        if not db_file.exists():
+            db_file.touch()
+            _set_secure_permissions(db_file)
+            dbs_created.append(db_file.name)
+
+    click.echo(click.style("Initialized ynab-tui:", fg="green"))
+    click.echo(f"  Config: {config_file}")
+    if dbs_created:
+        click.echo(f"  Databases: {', '.join(dbs_created)} (secure permissions)")
+    click.echo()
+    click.echo("Next steps:")
+    click.echo("  1. Get your YNAB API token from https://app.ynab.com/settings/developer")
+    click.echo(f"  2. Edit {config_file} to add your token")
+    click.echo("  3. Run: ynab-tui pull --full")
+    click.echo()
+    click.echo("Amazon credentials are optional (for Amazon order matching).")
 
 
 @main.command("uncategorized")

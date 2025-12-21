@@ -46,18 +46,18 @@ uv sync --all-extras
 
 ## Configuration
 
-Copy the example config and fill in your credentials:
+Initialize the configuration file:
 
 ```bash
-mkdir -p ~/.config/ynab-tui
-cp config.example.toml ~/.config/ynab-tui/config.toml
+ynab-tui init
 ```
 
-Required credentials:
-- **YNAB API token** - Get from https://app.ynab.com/settings/developer
-- **Amazon credentials** - Your Amazon login (for order history scraping via [amazon-orders](https://github.com/alexdlaird/amazon-orders))
+This creates `~/.config/ynab-tui/config.toml`. Edit it to add your credentials:
 
-You can also use environment variables:
+- **YNAB API token** (required) - Get from https://app.ynab.com/settings/developer
+- **Amazon credentials** (optional) - For order history scraping via [amazon-orders](https://github.com/alexdlaird/amazon-orders)
+
+You can also use environment variables instead of the config file:
 ```bash
 export YNAB_API_TOKEN="your-token"
 export AMAZON_USERNAME="your-email"
@@ -100,6 +100,9 @@ ynab-tui --version
 ### CLI Commands
 
 ```bash
+# Setup
+ynab-tui init              # Create config file at ~/.config/ynab-tui/config.toml
+
 # Sync commands (git-style pull/push)
 ynab-tui pull              # Pull YNAB + Amazon data to local DB
 ynab-tui pull --full       # Full pull of all data
@@ -167,6 +170,17 @@ Mock mode (no live APIs):
 3. **Review** uncategorized transactions in the TUI
 4. **Categorize** using the category picker or split into individual items
 5. **Push** your changes back to YNAB
+
+### Data Storage
+
+Transaction and order data is stored locally in an **unencrypted** SQLite database at `~/.config/ynab-tui/categorizer.db`. This includes your YNAB transactions, Amazon order history, and categorization decisions.
+
+For security, ensure appropriate file permissions:
+```bash
+chmod 600 ~/.config/ynab-tui/*.db
+```
+
+Database encryption is planned for a future release.
 
 ### Typical Workflow
 
