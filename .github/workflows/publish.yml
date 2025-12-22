@@ -52,9 +52,32 @@ jobs:
           name: dist
           path: dist/
 
+  test-install:
+    name: Test install (Python ${{ matrix.python-version }})
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: astral-sh/setup-uv@v4
+      - name: Create venv and install wheel
+        run: |
+          uv venv --python ${{ matrix.python-version }} test-venv
+          uv pip install dist/*.whl --python test-venv
+      - name: Smoke test
+        run: |
+          test-venv/bin/ynab-tui --version
+          test-venv/bin/ynab-tui --help
+
   publish:
     name: Publish to PyPI
-    needs: build
+    needs: test-install
     runs-on: ubuntu-latest
     environment: pypi
     permissions:

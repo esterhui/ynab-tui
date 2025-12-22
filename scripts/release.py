@@ -368,6 +368,83 @@ def run_command(cmd: list[str], description: str, dry_run: bool) -> bool:
         return False
 
 
+def test_wheel_install(root: Path, version: Version, dry_run: bool) -> bool:
+    """Test that the built wheel installs correctly in a fresh venv.
+
+    Creates a temporary venv, installs the wheel, and runs smoke tests.
+    This catches dependency issues that wouldn't be found by uv sync.
+    """
+    import shutil
+    import tempfile
+
+    wheel = root / "dist" / f"ynab_tui-{version}-py3-none-any.whl"
+
+    if dry_run:
+        print_dry_run(f"Would test install: {wheel.name}")
+        return True
+
+    if not wheel.exists():
+        print_error(f"Wheel not found: {wheel}")
+        return False
+
+    print_info("Testing wheel installation in fresh venv...")
+
+    # Create temp directory for test venv
+    temp_dir = Path(tempfile.mkdtemp(prefix="ynab-tui-test-"))
+    venv_dir = temp_dir / "venv"
+
+    try:
+        # Create venv with uv
+        result = subprocess.run(
+            ["uv", "venv", str(venv_dir)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print_error(f"Failed to create venv: {result.stderr}")
+            return False
+
+        # Install wheel
+        result = subprocess.run(
+            ["uv", "pip", "install", str(wheel), "--python", str(venv_dir)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print_error(f"Failed to install wheel: {result.stderr}")
+            return False
+
+        # Run smoke tests
+        binary = venv_dir / "bin" / "ynab-tui"
+
+        # Test --version
+        result = subprocess.run(
+            [str(binary), "--version"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print_error(f"Smoke test failed (--version): {result.stderr}")
+            return False
+
+        # Test --help
+        result = subprocess.run(
+            [str(binary), "--help"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            print_error(f"Smoke test failed (--help): {result.stderr}")
+            return False
+
+        print_success(f"Wheel installs and runs correctly")
+        return True
+
+    finally:
+        # Cleanup temp directory
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -380,10 +457,11 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s 0.2.0           Execute release (update versions, test, build, commit, tag)
-  %(prog)s 0.2.0 --dry-run Preview all steps without making any changes
-  %(prog)s 0.2.0 --skip-tests  Skip running tests (faster, but risky)
-  %(prog)s 0.2.0 --no-tag  Skip creating git tag
+  %(prog)s 0.2.0                  Execute release (update, test, build, commit, tag)
+  %(prog)s 0.2.0 --dry-run        Preview all steps without making any changes
+  %(prog)s 0.2.0 --test-install   Test wheel installs correctly before committing
+  %(prog)s 0.2.0 --skip-tests     Skip running tests (faster, but risky)
+  %(prog)s 0.2.0 --no-tag         Skip creating git tag
 
 Before running, make sure CHANGELOG.md has an entry for the new version.
         """,
@@ -406,6 +484,11 @@ Before running, make sure CHANGELOG.md has an entry for the new version.
         "--no-tag",
         action="store_true",
         help="Skip creating git tag (tag is created by default)",
+    )
+    parser.add_argument(
+        "--test-install",
+        action="store_true",
+        help="Test package installs correctly in fresh venv after build",
     )
 
     args = parser.parse_args()
@@ -527,6 +610,13 @@ Before running, make sure CHANGELOG.md has an entry for the new version.
         wheel = dist_dir / f"ynab_tui-{new_version}-py3-none-any.whl"
         if wheel.exists():
             print_success(f"Package built: {wheel.name}")
+
+    # Test wheel installation (optional but recommended)
+    if args.test_install:
+        if not test_wheel_install(root, new_version, args.dry_run):
+            return 1
+    else:
+        print_info("Skipping install test (use --test-install to enable)")
 
     # ==========================================================================
     # Commit and tag
