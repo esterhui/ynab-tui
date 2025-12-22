@@ -460,6 +460,7 @@ Examples:
   %(prog)s 0.2.0                  Execute release (update, test, build, commit, tag)
   %(prog)s 0.2.0 --dry-run        Preview all steps without making any changes
   %(prog)s 0.2.0 --test-install   Test wheel installs correctly before committing
+  %(prog)s 0.2.0 --force          Re-release same version (deletes existing tag)
   %(prog)s 0.2.0 --skip-tests     Skip running tests (faster, but risky)
   %(prog)s 0.2.0 --no-tag         Skip creating git tag
 
@@ -489,6 +490,11 @@ Before running, make sure CHANGELOG.md has an entry for the new version.
         "--test-install",
         action="store_true",
         help="Test package installs correctly in fresh venv after build",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force re-release of same version (deletes existing tag, skips version check)",
     )
 
     args = parser.parse_args()
@@ -530,22 +536,42 @@ Before running, make sure CHANGELOG.md has an entry for the new version.
 
     # Check if tag already exists
     if tag_exists(root, new_version):
-        print_error(f"Tag v{new_version} already exists!")
-        print_info(f"Did you mean v{new_version.suggest_next()}?")
-        return 1
-    print_success(f"Tag v{new_version} does not exist")
+        if args.force:
+            print_warning(f"Tag v{new_version} exists - will delete and recreate (--force)")
+            if not args.dry_run:
+                # Delete local tag
+                subprocess.run(
+                    ["git", "tag", "-d", f"v{new_version}"],
+                    capture_output=True,
+                    cwd=root,
+                )
+                # Delete remote tag (ignore errors if not pushed)
+                subprocess.run(
+                    ["git", "push", "origin", "--delete", f"v{new_version}"],
+                    capture_output=True,
+                    cwd=root,
+                )
+        else:
+            print_error(f"Tag v{new_version} already exists!")
+            print_info(f"Use --force to delete and recreate, or try v{new_version.suggest_next()}")
+            return 1
+    else:
+        print_success(f"Tag v{new_version} does not exist")
 
-    # Check version increment (skip for first release)
+    # Check version increment (skip for first release or --force)
     existing_tags = get_existing_tags(root)
-    if existing_tags:
+    if existing_tags and not args.force:
         # Not first release - require version > current
         if not new_version > current_version:
             print_error(
                 f"New version {new_version} must be greater than current "
                 f"{current_version}"
             )
+            print_info("Use --force to re-release the same version")
             return 1
         print_success(f"Version {new_version} > {current_version}")
+    elif args.force:
+        print_success(f"Version check skipped (--force)")
     else:
         print_success("First release - skipping version comparison")
 
