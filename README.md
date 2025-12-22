@@ -3,7 +3,7 @@
 [![CI](https://github.com/esterhui/ynab-tui/actions/workflows/ci.yml/badge.svg)](https://github.com/esterhui/ynab-tui/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/esterhui/ynab-tui/graph/badge.svg)](https://codecov.io/gh/esterhui/ynab-tui)
 [![PyPI](https://img.shields.io/pypi/v/ynab-tui)](https://pypi.org/project/ynab-tui/)
-[![Python 3.11-3.12](https://img.shields.io/badge/python-3.11--3.12-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
@@ -27,19 +27,19 @@ A terminal user interface for categorizing YNAB (You Need A Budget) transactions
 
 ## Installation
 
-**Requires Python 3.11 or 3.12** (Python 3.13 not yet supported due to a [dependency issue](https://github.com/a-maliarov/amazoncaptcha/issues/47))
+**Requires Python 3.11** (Python 3.12+ not yet supported due to a [dependency issue](https://github.com/a-maliarov/amazoncaptcha/issues/47) with amazoncaptcha/pillow)
 
 ### From PyPI (Recommended)
 
 ```bash
-# With pip
+# With pip (ensure Python 3.11)
 pip install ynab-tui
 
 # With uv (specify Python version)
-uv pip install ynab-tui --python 3.12
+uv pip install ynab-tui --python 3.11
 
 # With pipx
-pipx install ynab-tui --python python3.12
+pipx install ynab-tui --python python3.11
 ```
 
 ### From Source

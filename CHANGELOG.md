@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.1] - 2025-12-21
 
 ### Changed
-- Restrict Python version to 3.11-3.12 due to `amazoncaptcha` dependency requiring `pillow<9.6.0` which has no Python 3.13 wheels
+- Restrict Python version to 3.11 due to `amazoncaptcha` dependency requiring `pillow<9.6.0` which only has Linux/macOS wheels for Python 3.11
 - Rename package directory from `src/` to `ynab_tui/` for conventional Python packaging
 
 ### Added
