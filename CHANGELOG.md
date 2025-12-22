@@ -5,6 +5,17 @@ All notable changes to YNAB TUI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2025-12-21
+
+### Changed
+- Restrict Python version to 3.11-3.12 due to `amazoncaptcha` dependency requiring `pillow<9.6.0` which has no Python 3.13 wheels
+- Rename package directory from `src/` to `ynab_tui/` for conventional Python packaging
+
+### Added
+- Wheel install testing in CI before PyPI publish to catch dependency issues
+- `--test-install` flag in release script for local wheel verification
+
+
 ## [0.1.0] - 2024-12-20
 
 Initial release of YNAB TUI - a terminal user interface for categorizing YNAB transactions with Amazon order matching.
