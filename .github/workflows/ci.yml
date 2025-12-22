@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PYTHON_VERSION: "3.13"
+  PYTHON_VERSION: "3.12"
 
 jobs:
   check:
@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
@@ -48,7 +48,7 @@ jobs:
       - run: uv sync --all-extras
       - run: uv run pytest tests/ --cov=ynab_tui --cov-report=xml -n auto
       - uses: codecov/codecov-action@v4
-        if: matrix.python-version == '3.13'
+        if: matrix.python-version == '3.12'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
