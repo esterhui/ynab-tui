@@ -316,7 +316,7 @@ class TestTUIPushPreview:
             assert db.get_pending_change_count() == 1
 
     async def test_push_preview_confirm_and_push(self, tui_app_with_pending):
-        """Test 'p' then 'y' pushes changes and closes screen."""
+        """Test 'y' pushes changes and closes screen."""
         async with tui_app_with_pending.run_test() as pilot:
             await pilot.pause()
 
@@ -328,12 +328,9 @@ class TestTUIPushPreview:
             await pilot.press("p")
             await pilot.pause()
 
-            # Press 'p' to show confirmation
-            await pilot.press("p")
-            await pilot.pause()
-
-            # Press 'y' to confirm push
+            # Press 'y' to push directly
             await pilot.press("y")
+            await pilot.pause()
 
             # Wait for all workers to complete (push worker + reload worker)
             await tui_app_with_pending.workers.wait_for_complete()
@@ -347,8 +344,8 @@ class TestTUIPushPreview:
             # Pending change should be cleared after successful push
             assert db.get_pending_change_count() == 0
 
-    async def test_push_preview_cancel_confirmation(self, tui_app_with_pending):
-        """Test 'n' cancels confirmation prompt."""
+    async def test_push_preview_cancel_with_n(self, tui_app_with_pending):
+        """Test 'n' cancels push preview and closes screen."""
         async with tui_app_with_pending.run_test() as pilot:
             await pilot.pause()
 
@@ -358,19 +355,15 @@ class TestTUIPushPreview:
             await pilot.press("p")
             await pilot.pause()
 
-            # Press 'p' to show confirmation
-            await pilot.press("p")
-            await pilot.pause()
-
-            # Press 'n' to cancel confirmation
+            # Press 'n' to cancel (same as 'q')
             await pilot.press("n")
             await pilot.pause()
 
-            # Should still be on push preview screen
+            # Should return to main screen
             from ynab_tui.tui.screens import PushPreviewScreen
 
             screens = tui_app_with_pending.screen_stack
-            assert any(isinstance(s, PushPreviewScreen) for s in screens)
+            assert not any(isinstance(s, PushPreviewScreen) for s in screens)
 
             # Pending change should still exist
             assert db.get_pending_change_count() == 1
@@ -1931,8 +1924,9 @@ class TestPushChangeItemFormatRow:
         item = PushChangeItem(change)
         row = item._format_row()
 
-        assert "Uncategorized" in row
-        assert "Groceries" in row
+        # Categories are truncated to 8 chars each in "old -> new" format
+        assert "Uncatego" in row  # Truncated from "Uncategorized"
+        assert "Grocerie" in row  # Truncated from "Groceries"
         assert "->" in row
 
     def test_category_change_between_categories(self):
@@ -1951,8 +1945,9 @@ class TestPushChangeItemFormatRow:
         item = PushChangeItem(change)
         row = item._format_row()
 
-        assert "Groceries" in row
-        assert "Home Improvemen" in row  # Truncated at 15 chars
+        # Categories are truncated to 8 chars each in "old -> new" format
+        assert "Grocerie" in row  # Truncated from "Groceries"
+        assert "Home Imp" in row  # Truncated from "Home Improvement"
         assert "->" in row
 
     def test_split_transaction_shows_split(self):

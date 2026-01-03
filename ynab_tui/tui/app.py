@@ -32,7 +32,7 @@ from .modals import (
     TransactionSummary,
     get_unique_payees,
 )
-from .screens import ItemSplitScreen, PushPreviewScreen, SettingsScreen
+from .screens import HelpScreen, ItemSplitScreen, PushPreviewScreen, SettingsScreen
 from .state import (
     CategoryFilter,
     FilterState,
@@ -1181,49 +1181,4 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
 
     def action_show_help(self) -> None:
         """Show help screen."""
-        # Clear any existing notifications first to prevent stacking
-        self.clear_notifications()
-        help_text = """
-[b]Vim-style Navigation:[/b]
-  j/↓     Move down
-  k/↑     Move up
-  g       Go to top
-  G       Go to bottom
-  Ctrl+d  Half page down
-  Ctrl+u  Half page up
-  Ctrl+f  Full page down
-  Ctrl+b  Full page up
-
-[b]Tagging & Bulk Actions:[/b]
-  t       Tag/untag transaction (★ green star)
-  c/Enter Categorize (bulk if tagged)
-  a       Approve (bulk if tagged)
-
-[b]Categorization:[/b]
-  x       Split mode (Amazon multi-item)
-  m       Edit memo
-  u       Undo pending change (revert to original)
-
-[b]Other Actions:[/b]
-  f       Filter menu (then press a/n/u/p/x)
-  T       Untag all tagged transactions
-  s       Settings
-  F5      Refresh
-  q       Quit
-
-[b]Filter Shortcuts (after pressing f):[/b]
-  fa      Approved transactions
-  fn      New (unapproved) transactions
-  fu      Uncategorized transactions
-  fp      Pending push to YNAB
-  fx      All transactions
-
-[b]Status Column Legend:[/b]
-  A       Approved
-  C       Cleared
-  R       Reconciled
-  M       Has memo
-  P       Pending push to YNAB
-  !       Sync conflict
-"""
-        self.notify(help_text, title="Help", timeout=15)
+        self.push_screen(HelpScreen())

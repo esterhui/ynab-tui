@@ -141,18 +141,6 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
         background: $primary;
     }
 
-    #confirmation-bar {
-        dock: bottom;
-        height: 3;
-        padding: 0 1;
-        background: $warning-darken-2;
-        content-align: center middle;
-    }
-
-    #confirmation-bar.--hidden {
-        display: none;
-    }
-
     #status-bar {
         dock: bottom;
         height: 1;
@@ -183,11 +171,11 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
     """
 
     BINDINGS = [
-        Binding("p", "confirm_push", "Push"),
-        Binding("q", "cancel", "Cancel"),
-        Binding("y", "do_push", "Confirm", show=False),
-        Binding("n", "cancel_confirm", "Cancel", show=False),
-        Binding("escape", "cancel_confirm", "Cancel", show=False),
+        Binding("enter", "do_push", "Push"),
+        Binding("y", "do_push", "Push", show=False),
+        Binding("q", "cancel", "Cancel", show=False),
+        Binding("n", "cancel", "Cancel", show=False),
+        Binding("escape", "cancel", "Cancel"),
         # Vim-style navigation
         *VIM_NAVIGATION_BINDINGS,
     ]
@@ -207,7 +195,6 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
         super().__init__(**kwargs)
         self._categorizer = categorizer
         self._changes = changes
-        self._confirming = False
         self._pushing = False
 
     def compose(self) -> ComposeResult:
@@ -215,8 +202,8 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
         yield Header()
         yield Container(
             Static(
-                f"[b]Pending Changes ({len(self._changes)})[/b]\n"
-                "[dim]Press 'p' to push, 'q' to cancel[/dim]",
+                f"[b]Review {len(self._changes)} Pending Changes[/b]\n"
+                "[dim]Press Enter to push, q/Esc to cancel[/dim]",
                 id="header-label",
             ),
             ListView(
@@ -232,11 +219,6 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
             id="progress-container",
             classes="--hidden",
         )
-        yield Static(
-            f"[b]Push {len(self._changes)} changes to YNAB? (y/n)[/b]",
-            id="confirmation-bar",
-            classes="--hidden",
-        )
         yield Footer()
 
     def _get_list_view(self) -> ListView | None:
@@ -246,37 +228,12 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
         except Exception:
             return None
 
-    def action_confirm_push(self) -> None:
-        """Show confirmation prompt."""
+    def action_do_push(self) -> None:
+        """Execute the push to YNAB."""
         if self._pushing:
             return
 
-        self._confirming = True
-        confirmation_bar = self.query_one("#confirmation-bar")
-        confirmation_bar.remove_class("--hidden")
-        self._update_status("Press 'y' to confirm push, 'n' to cancel")
-
-    def action_cancel_confirm(self) -> None:
-        """Cancel the confirmation, or exit screen if not confirming."""
-        if not self._confirming:
-            self.action_cancel()
-            return
-
-        self._confirming = False
-        confirmation_bar = self.query_one("#confirmation-bar")
-        confirmation_bar.add_class("--hidden")
-        self._update_status("")
-
-    def action_do_push(self) -> None:
-        """Execute the push to YNAB."""
-        if not self._confirming or self._pushing:
-            return
-
         self._pushing = True
-        self._confirming = False
-        confirmation_bar = self.query_one("#confirmation-bar")
-        confirmation_bar.add_class("--hidden")
-        self._update_status("")
         self._show_progress_bar()
 
         # Run push in background worker (thread=True for sync function)
@@ -333,7 +290,7 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
             self._hide_progress_bar()
             self.notify(f"Push failed: {event.worker.error}", severity="error")
             self._pushing = False
-            self._update_status("Push failed - press 'p' to retry or 'q' to cancel")
+            self._update_status("Push failed - press Enter to retry or q/Esc to cancel")
 
     def action_cancel(self) -> None:
         """Cancel and close the screen."""
