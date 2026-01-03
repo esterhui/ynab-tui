@@ -48,20 +48,35 @@ class PushChangeItem(ListItem):
         amount = change.get("amount", 0)
         amount_str = f"${abs(amount):.2f}".rjust(10)
 
-        # Format change description
+        # Format change description based on what actually changed
         change_type = change.get("change_type", "category")
-        old_cat = change.get("original_category_name") or "Uncategorized"
-        new_cat = change.get("new_category_name") or "Uncategorized"
+        new_values = change.get("new_values", {})
+        original_values = change.get("original_values", {})
+
+        # Check what actually changed
+        has_category_change = "category_id" in new_values or "category_name" in new_values
 
         if change_type == "split":
             # For splits, show simple indicator
             change_desc = "[cyan]-> Split[/cyan]"
-        else:
-            # Category change: old -> new
+        elif has_category_change:
+            # Category change - show old -> new
+            old_cat = (
+                change.get("original_category_name")
+                or original_values.get("category_name")
+                or "Uncategorized"
+            )
+            new_cat = (
+                change.get("new_category_name") or new_values.get("category_name") or "Unknown"
+            )
             if old_cat == new_cat:
                 change_desc = f"{new_cat[:20]}"
             else:
                 change_desc = f"{old_cat[:15]} -> {new_cat[:15]}"
+        else:
+            # No category change - show transaction's actual category
+            actual_cat = change.get("category_name") or "Uncategorized"
+            change_desc = f"{actual_cat[:20]}"
 
         # Format approval change (+A or -A)
         approval_change = ""

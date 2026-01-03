@@ -13,6 +13,7 @@ from ynab_tui.db.database import Database
 from ynab_tui.models import Transaction
 from ynab_tui.services.categorizer import CategorizerService
 from ynab_tui.tui.app import YNABCategorizerApp
+from ynab_tui.tui.screens.push_preview import PushChangeItem
 from ynab_tui.tui.state import TagManager, TagState
 
 
@@ -1871,6 +1872,106 @@ class TestPushPreviewEdgeCases:
             # Cancel with escape
             await pilot.press("escape")
             await pilot.pause()
+
+
+class TestPushChangeItemFormatRow:
+    """Unit tests for PushChangeItem._format_row() method.
+
+    These tests verify that pending changes are displayed correctly in the
+    push preview screen, catching bugs like showing 'Uncategorized' for
+    approve-only changes on already-categorized transactions.
+    """
+
+    def test_approve_only_shows_actual_category(self):
+        """Approve-only change should show actual category, not 'Uncategorized'.
+
+        Bug: When approving an already-categorized transaction, the display
+        was showing 'Uncategorized +A' instead of 'Software Subscription +A'.
+        """
+        change = {
+            "date": "2025-12-23",
+            "payee_name": "Claude.ai",
+            "amount": -100.0,
+            "change_type": "update",
+            "new_values": {"approved": True},
+            "original_values": {"approved": False},
+            # No category change in pending - this is approve-only
+            "new_category_name": None,
+            "original_category_name": None,
+            # But the transaction HAS a category (from YNAB)
+            "category_name": "Software Subscription",
+            "new_approved": True,
+            "original_approved": False,
+        }
+        item = PushChangeItem(change)
+        row = item._format_row()
+
+        # Should NOT show "Uncategorized" since the transaction has a category
+        assert "Uncategorized" not in row
+        # Should show the actual category (may be truncated to 20 chars)
+        assert "Software Subscriptio" in row  # Truncated at 20 chars
+        # Should show approval indicator
+        assert "+A" in row
+
+    def test_category_change_shows_old_to_new(self):
+        """Category change should show 'old -> new' format."""
+        change = {
+            "date": "2025-12-23",
+            "payee_name": "Amazon",
+            "amount": -50.0,
+            "change_type": "update",
+            "new_values": {"category_id": "cat-1", "category_name": "Groceries", "approved": True},
+            "original_values": {"category_id": None, "category_name": None, "approved": False},
+            "new_category_name": "Groceries",
+            "original_category_name": None,
+            "category_name": "Groceries",
+            "new_approved": True,
+            "original_approved": False,
+        }
+        item = PushChangeItem(change)
+        row = item._format_row()
+
+        assert "Uncategorized" in row
+        assert "Groceries" in row
+        assert "->" in row
+
+    def test_category_change_between_categories(self):
+        """Re-categorization should show 'old -> new' format."""
+        change = {
+            "date": "2025-12-23",
+            "payee_name": "Target",
+            "amount": -75.0,
+            "change_type": "update",
+            "new_values": {"category_id": "cat-2", "category_name": "Home Improvement"},
+            "original_values": {"category_id": "cat-1", "category_name": "Groceries"},
+            "new_category_name": "Home Improvement",
+            "original_category_name": "Groceries",
+            "category_name": "Home Improvement",
+        }
+        item = PushChangeItem(change)
+        row = item._format_row()
+
+        assert "Groceries" in row
+        assert "Home Improvemen" in row  # Truncated at 15 chars
+        assert "->" in row
+
+    def test_split_transaction_shows_split(self):
+        """Split transaction should show '-> Split' indicator."""
+        change = {
+            "date": "2025-12-23",
+            "payee_name": "Costco",
+            "amount": -200.0,
+            "change_type": "split",
+            "new_values": {"category_id": None, "category_name": "[Split 2]"},
+            "original_values": {"category_id": None, "category_name": None},
+            "new_category_name": "[Split 2]",
+            "original_category_name": None,
+            "category_name": "[Split 2]",
+        }
+        item = PushChangeItem(change)
+        row = item._format_row()
+
+        assert "Split" in row
 
 
 class TestApproveActionFlow:
