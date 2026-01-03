@@ -783,15 +783,18 @@ class TestFetchAllAmazonOrders:
             MockOrder("o2", datetime(2025, 1, 1), 100.0),
         ]
 
-        config = AmazonConfig(earliest_history_year=2024)
+        earliest_year = 2024
+        current_year = datetime.now().year
+        config = AmazonConfig(earliest_history_year=earliest_year)
         service = SyncService(temp_db, mock_ynab, mock_amazon, amazon_config=config)
 
         service._fetch_all_amazon_orders("Test")
 
-        # Should have called for 2025 and 2024
-        assert len(mock_amazon.get_orders_calls) == 2
-        assert 2025 in mock_amazon.get_orders_calls
-        assert 2024 in mock_amazon.get_orders_calls
+        # Should have called for each year from current down to earliest
+        expected_years = current_year - earliest_year + 1
+        assert len(mock_amazon.get_orders_calls) == expected_years
+        assert earliest_year in mock_amazon.get_orders_calls
+        assert current_year in mock_amazon.get_orders_calls
 
     def test_returns_empty_when_no_client(
         self, temp_db: Database, mock_ynab: MockYNABClient

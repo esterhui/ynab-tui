@@ -19,6 +19,7 @@ from ynab_tui.cli.formatters import (
     format_sync_time,
     format_transaction_row,
 )
+from ynab_tui.cli.helpers import display_pending_changes
 from ynab_tui.db.database import AmazonOrderCache
 from ynab_tui.services.amazon_matcher import AmazonMatchResult, TransactionInfo
 from ynab_tui.services.category_mapping import ItemCategoryPrediction, OrderCategoryPrediction
@@ -569,3 +570,77 @@ class TestDisplayAmazonMatchResults:
         assert "Summary:" in captured.out
         assert "matched" in captured.out.lower()
         assert "unmatched" in captured.out.lower()
+
+
+class TestDisplayPendingChanges:
+    """Tests for display_pending_changes function."""
+
+    def test_approve_only_shows_actual_category(self, capsys):
+        """Approve-only change should show actual category, not 'Split'.
+
+        Bug: When approving an already-categorized transaction, the display
+        was showing 'Uncategorized -> Split' instead of the actual category.
+        """
+        # This represents an approve-only pending change
+        # (new_values only has approved=True, no category_id/category_name)
+        pending = [
+            {
+                "date": "2025-12-23",
+                "payee_name": "Claude.ai",
+                "amount": -100.0,
+                "new_values": {"approved": True},
+                "original_values": {"approved": False},
+                # No category fields in pending change - this is the bug case
+                "new_category_name": None,
+                "original_category_name": None,
+                # But the transaction HAS a category (from YNAB)
+                "category_name": "Software Subscription",
+            }
+        ]
+        display_pending_changes(pending)
+        captured = capsys.readouterr()
+        # Should NOT show "Uncategorized -> Split"
+        assert "Split" not in captured.out
+        assert "Uncategorized" not in captured.out
+        # Should show actual category or indication of approval
+        assert "Software Subscription" in captured.out or "Approved" in captured.out
+
+    def test_category_change_shows_old_to_new(self, capsys):
+        """Category change should show old -> new category."""
+        pending = [
+            {
+                "date": "2025-12-23",
+                "payee_name": "Amazon",
+                "amount": -50.0,
+                "new_values": {
+                    "category_id": "cat-1",
+                    "category_name": "Groceries",
+                    "approved": True,
+                },
+                "original_values": {"category_id": None, "category_name": None, "approved": False},
+                "new_category_name": "Groceries",
+                "original_category_name": None,
+                "category_name": "Groceries",
+            }
+        ]
+        display_pending_changes(pending)
+        captured = capsys.readouterr()
+        assert "Uncategorized -> Groceries" in captured.out
+
+    def test_category_change_with_existing_category(self, capsys):
+        """Category change from one category to another."""
+        pending = [
+            {
+                "date": "2025-12-23",
+                "payee_name": "Target",
+                "amount": -75.0,
+                "new_values": {"category_id": "cat-2", "category_name": "Home Improvement"},
+                "original_values": {"category_id": "cat-1", "category_name": "Groceries"},
+                "new_category_name": "Home Improvement",
+                "original_category_name": "Groceries",
+                "category_name": "Home Improvement",
+            }
+        ]
+        display_pending_changes(pending)
+        captured = capsys.readouterr()
+        assert "Groceries -> Home Improvement" in captured.out

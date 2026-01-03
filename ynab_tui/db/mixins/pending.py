@@ -176,7 +176,8 @@ class PendingChangesMixin(DatabaseMixin):
                     pc.original_category_id, pc.original_category_name,
                     pc.new_approved, pc.original_approved,
                     pc.created_at,
-                    t.date, t.amount, t.payee_name, t.account_name, t.approved, t.memo
+                    t.date, t.amount, t.payee_name, t.account_name, t.approved, t.memo,
+                    t.category_name, t.category_id
                 FROM pending_changes pc
                 JOIN ynab_transactions t ON pc.transaction_id = t.id
                 {where_clause}

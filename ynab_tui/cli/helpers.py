@@ -62,12 +62,37 @@ def display_pending_changes(pending_changes: list[dict[str, Any]]) -> None:
     click.echo(f"{'Date':<12} {'Payee':<25} {'Amount':>12}  Change")
     click.echo("-" * 75)
     for change in pending_changes:
-        old_cat = change.get("original_category_name") or "Uncategorized"
-        new_cat = change.get("new_category_name") or "Split"
         date_str = str(change.get("date", ""))[:10]
         payee = (change.get("payee_name") or "")[:25]
         amount = change.get("amount", 0)
-        click.echo(f"{date_str:<12} {payee:<25} {amount:>12.2f}  {old_cat} -> {new_cat}")
+
+        new_values = change.get("new_values", {})
+        original_values = change.get("original_values", {})
+
+        # Check what actually changed
+        has_category_change = "category_id" in new_values or "category_name" in new_values
+        has_approval_change = "approved" in new_values
+
+        if has_category_change:
+            # Category change - show old -> new category
+            old_cat = (
+                change.get("original_category_name")
+                or original_values.get("category_name")
+                or "Uncategorized"
+            )
+            new_cat = (
+                change.get("new_category_name") or new_values.get("category_name") or "Unknown"
+            )
+            change_desc = f"{old_cat} -> {new_cat}"
+        elif has_approval_change:
+            # Approval-only change - show the transaction's actual category
+            actual_cat = change.get("category_name") or "Uncategorized"
+            change_desc = f"{actual_cat} (Approved)"
+        else:
+            # Other change type (e.g., memo)
+            change_desc = "Updated"
+
+        click.echo(f"{date_str:<12} {payee:<25} {amount:>12.2f}  {change_desc}")
 
 
 def get_categorizer(ctx: Context) -> CategorizerService:

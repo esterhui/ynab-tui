@@ -99,6 +99,8 @@ class TestDisplayPendingChanges:
                 "amount": -47.82,
                 "original_category_name": None,
                 "new_category_name": "Electronics",
+                "new_values": {"category_id": "cat-1", "category_name": "Electronics"},
+                "original_values": {"category_id": None, "category_name": None},
             },
             {
                 "date": "2024-06-14",
@@ -106,6 +108,8 @@ class TestDisplayPendingChanges:
                 "amount": -127.43,
                 "original_category_name": "Groceries",
                 "new_category_name": "Home & Garden",
+                "new_values": {"category_id": "cat-2", "category_name": "Home & Garden"},
+                "original_values": {"category_id": "cat-3", "category_name": "Groceries"},
             },
         ]
         display_pending_changes(changes)
@@ -121,14 +125,16 @@ class TestDisplayPendingChanges:
         assert "Home & Garden" in captured.out
 
     def test_split_transaction_shows_split(self, capsys):
-        """Test that split transaction shows 'Split' as new category."""
+        """Test that split transaction shows '[Split 2]' as new category."""
         changes = [
             {
                 "date": "2024-06-15",
                 "payee_name": "Test Payee",
                 "amount": -100.00,
                 "original_category_name": "Groceries",
-                "new_category_name": None,  # Split transactions have None
+                "new_category_name": "[Split 2]",
+                "new_values": {"category_id": None, "category_name": "[Split 2]"},
+                "original_values": {"category_id": "cat-1", "category_name": "Groceries"},
             },
         ]
         display_pending_changes(changes)
@@ -144,6 +150,8 @@ class TestDisplayPendingChanges:
                 "amount": -50.00,
                 "original_category_name": "Test",
                 "new_category_name": "Other",
+                "new_values": {"category_id": "cat-1", "category_name": "Other"},
+                "original_values": {"category_id": "cat-2", "category_name": "Test"},
             },
         ]
         display_pending_changes(changes)
