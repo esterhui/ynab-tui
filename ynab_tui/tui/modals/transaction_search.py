@@ -2,7 +2,11 @@
 
 from ynab_tui.models.transaction import Transaction
 
+from ..layout import ColumnWidths
 from .fuzzy_select import FuzzySelectModal
+
+# Default widths for search modal (slightly reduced for modal width)
+_WIDTHS = ColumnWidths(payee=24, category=0, account=0)
 
 
 class TransactionSearchModal(FuzzySelectModal[str]):
@@ -31,7 +35,8 @@ class TransactionSearchModal(FuzzySelectModal[str]):
     @staticmethod
     def _format_transaction(txn: Transaction) -> str:
         """Format transaction for display: date | payee | amount."""
-        date_str = txn.display_date
-        payee = (txn.payee_name or "")[:22].ljust(22)
-        amount = txn.display_amount.rjust(12)
+        w = _WIDTHS
+        date_str = txn.display_date[: w.date].ljust(w.date)
+        payee = (txn.payee_name or "")[: w.payee].ljust(w.payee)
+        amount = txn.display_amount.rjust(w.amount)
         return f"{date_str}  {payee}  {amount}"

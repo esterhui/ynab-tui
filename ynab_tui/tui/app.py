@@ -8,7 +8,7 @@ from typing import Optional
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal
+from textual.containers import Container
 from textual.css.query import NoMatches
 from textual.timer import Timer
 from textual.widgets import Footer, ListItem, ListView, Static
@@ -18,6 +18,7 @@ from ..models import Transaction, TransactionBatch
 from ..services import CategorizerService
 from .constants import VIM_NAVIGATION_BINDINGS
 from .handlers import ActionHandler
+from .layout import ColumnWidths, calculate_column_widths, format_header_row
 from .mixins import ListViewNavigationMixin
 from .modals import (
     BudgetPickerModal,
@@ -55,16 +56,22 @@ class TransactionListItem(ListItem):
         self,
         txn: Transaction,
         tag_state: TagState | None = None,
+        column_widths: ColumnWidths | None = None,
+        color_status_letters: bool = False,
     ) -> None:
         """Initialize with a transaction.
 
         Args:
             txn: The transaction to display.
             tag_state: Tag state for checking if transaction is tagged.
+            column_widths: Column width configuration for formatting.
+            color_status_letters: Whether to color-code status letters.
         """
         super().__init__()
         self.txn = txn
         self._tag_state = tag_state if tag_state is not None else TagState()
+        self._column_widths = column_widths if column_widths is not None else ColumnWidths()
+        self._color_status_letters = color_status_letters
 
         # Apply status-based styling classes
         if txn.sync_status == "pending_push":
@@ -95,66 +102,86 @@ class TransactionListItem(ListItem):
     def _format_row(self) -> str:
         """Format the transaction as a row string."""
         txn = self.txn
+        w = self._column_widths
+        sp = " " * w.col_spacing
 
-        # Format date (10 chars)
-        date_str = txn.display_date
+        # Format date (fixed width)
+        date_str = txn.display_date[: w.date].ljust(w.date)
 
-        # Tag indicator (green star) - 2 chars
+        # Tag indicator (green star) - 2 chars + Amazon indicator - 2 chars
+        # Remaining for payee name
+        payee_name_width = w.payee - 4  # Reserve 4 chars for indicators
         tag = "[green]★[/green] " if self._tag_state.contains(txn.id) else "  "
-
-        # Format payee with Amazon indicator (20 chars total: 2 for tag + 2 for amazon + 18 for name)
-        payee = txn.payee_name[:18].ljust(18)
+        payee = txn.payee_name[:payee_name_width].ljust(payee_name_width)
         if txn.is_amazon:
             payee = f"[yellow]*[/yellow] {payee}"
         else:
             payee = f"  {payee}"  # Align with Amazon indicator
         payee = f"{tag}{payee}"
 
-        # Format amount (12 chars, right-aligned)
-        amount = txn.display_amount.rjust(12)
+        # Format amount (fixed width, right-aligned)
+        amount = txn.display_amount.rjust(w.amount)
 
-        # Format category (20 chars)
+        # Format category (dynamic width)
+        cat_width = w.category
         if txn.is_transfer:
-            # Show transfer target account
             target = txn.transfer_account_name or "Transfer"
-            transfer_text = f"-> {target}"[:20]
-            category = f"[cyan]{transfer_text:<20}[/cyan]"
+            transfer_text = f"-> {target}"[:cat_width]
+            category = f"[cyan]{transfer_text:<{cat_width}}[/cyan]"
         elif txn.is_balance_adjustment:
-            # Show descriptive label for balance adjustments
-            # Note: Use parentheses, not brackets - Rich interprets [] as markup
-            category = f"[dim]{'(Balance Adj)':<20}[/dim]"
+            category = f"[dim]{'(Balance Adj)':<{cat_width}}[/dim]"
         elif txn.category_name:
-            category = txn.category_name[:20].ljust(20)
+            category = txn.category_name[:cat_width].ljust(cat_width)
         else:
-            category = " " * 20
+            category = " " * cat_width
 
-        # Format account (16 chars)
-        account = (txn.account_name or "")[:16].ljust(16)
+        # Format account (dynamic width)
+        account = (txn.account_name or "")[: w.account].ljust(w.account)
 
-        # Format status (6 chars)
+        # Format status (fixed width) with optional color-coding
         status_flags = ""
-        if txn.approved:
-            status_flags += "A"
-        if txn.cleared == "cleared":
-            status_flags += "C"
-        elif txn.cleared == "reconciled":
-            status_flags += "R"
-        if txn.memo:
-            status_flags += "M"
-        if txn.sync_status == "pending_push":
-            status_flags += "P"
-        elif txn.sync_status == "conflict":
-            status_flags += "!"
-        status = status_flags.ljust(6)
+        if self._color_status_letters:
+            if txn.approved:
+                status_flags += "[green]A[/green]"
+            if txn.cleared == "cleared":
+                status_flags += "[cyan]C[/cyan]"
+            elif txn.cleared == "reconciled":
+                status_flags += "[blue]R[/blue]"
+            if txn.memo:
+                status_flags += "[yellow]M[/yellow]"
+            if txn.sync_status == "pending_push":
+                status_flags += "[magenta]P[/magenta]"
+            elif txn.sync_status == "conflict":
+                status_flags += "[red]![/red]"
+            # Calculate visible length (without Rich markup)
+            visible_len = sum(1 for c in status_flags if c in "ACRMP!")
+            status = status_flags + " " * (w.status - visible_len)
+        else:
+            # Plain text status (no colors)
+            if txn.approved:
+                status_flags += "A"
+            if txn.cleared == "cleared":
+                status_flags += "C"
+            elif txn.cleared == "reconciled":
+                status_flags += "R"
+            if txn.memo:
+                status_flags += "M"
+            if txn.sync_status == "pending_push":
+                status_flags += "P"
+            elif txn.sync_status == "conflict":
+                status_flags += "!"
+            status = status_flags.ljust(w.status)
 
         # Format enrichment on second line(s) - only show Amazon items
         enrichment = ""
         if txn.is_amazon and txn.amazon_items:
-            # Show all items on separate lines
-            lines = [f"{'':>12}[dim]↳ {item[:60]}[/dim]" for item in txn.amazon_items]
+            indent = w.date + w.col_spacing
+            lines = [f"{'':{indent}}[dim]↳ {item[:60]}[/dim]" for item in txn.amazon_items]
             enrichment = "\n" + "\n".join(lines)
 
-        return f"{date_str}  {payee}  {amount}  {category}  {account}  {status}{enrichment}"
+        return (
+            f"{date_str}{sp}{payee}{sp}{amount}{sp}{category}{sp}{account}{sp}{status}{enrichment}"
+        )
 
 
 class YNABCategorizerApp(ListViewNavigationMixin, App):
@@ -179,29 +206,6 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         width: 100%;
         height: 100%;
         padding: 0;
-    }
-
-    #header-stats {
-        dock: top;
-        height: 1;
-        background: $primary-background;
-        padding: 0 1;
-    }
-
-    .stat-box {
-        width: 1fr;
-        height: 100%;
-        content-align: center middle;
-        text-align: center;
-    }
-
-    .stat-value {
-        text-style: bold;
-        color: $text;
-    }
-
-    .stat-label {
-        color: $text-muted;
     }
 
     #transactions-list {
@@ -272,24 +276,24 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
     BINDINGS = [
         # Vim-style navigation (forward to ListView)
         *VIM_NAVIGATION_BINDINGS,
-        # Categorization
-        Binding("c", "categorize", "Categorize"),
-        Binding("x", "split", "Split"),
+        # Essential actions (shown in footer - 8 total)
+        Binding("c", "categorize", "Category"),
         Binding("a", "approve", "Approve"),
         Binding("m", "edit_memo", "Memo"),
-        Binding("u", "undo", "Undo"),
-        Binding("p", "push_preview", "Push"),
-        # Other actions
-        Binding("q", "quit", "Quit"),
-        Binding("escape", "quit", "Quit", show=False),
-        Binding("s", "settings", "Settings"),
-        Binding("b", "switch_budget", "Budget"),
         Binding("f", "cycle_filter", "Filter"),
         Binding("/", "fuzzy_search", "Search"),
-        Binding("t", "toggle_tag", "Tag"),
-        Binding("T", "clear_all_tags", "Untag All", show=False),
-        Binding("f5", "refresh", "Refresh"),
+        Binding("p", "push_preview", "Push"),
+        Binding("s", "settings", "Settings"),
         Binding("?", "show_help", "Help"),
+        # Hidden actions (still work, not shown in footer)
+        Binding("x", "split", "Split", show=False),
+        Binding("u", "undo", "Undo", show=False),
+        Binding("q", "quit", "Quit", show=False),
+        Binding("escape", "quit", "Quit", show=False),
+        Binding("b", "switch_budget", "Budget", show=False),
+        Binding("t", "toggle_tag", "Tag", show=False),
+        Binding("T", "clear_all_tags", "Untag All", show=False),
+        Binding("f5", "refresh", "Refresh", show=False),
     ]
 
     # Filter modes and their labels
@@ -340,6 +344,10 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         # Budget state - will be populated on mount
         self._current_budget_id: Optional[str] = None
         self._current_budget_name: Optional[str] = None
+        # Column widths - calculated based on terminal size
+        self._column_widths = ColumnWidths()
+        # Display settings from config
+        self._color_status_letters = categorizer.get_config().display.color_status_letters
 
     def _get_list_view(self) -> ListView | None:
         """Get the transactions ListView if it exists."""
@@ -349,10 +357,9 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             return None
 
     def _build_header_text(self) -> str:
-        """Build the header text with program name, version, mode, and budget."""
-        mode_indicator = "[yellow][MOCK][/yellow]" if self._is_mock else "[green][PROD][/green]"
+        """Build the header text with program name, version, and budget."""
         budget_name = self._current_budget_name or "Loading..."
-        return f"YNAB TUI v{__version__} {mode_indicator} | [cyan]{budget_name}[/cyan]"
+        return f"YNAB TUI v{__version__} │ [cyan]{budget_name}[/cyan]"
 
     def _update_header(self) -> None:
         """Update the header text with current budget name."""
@@ -363,19 +370,39 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             pass  # Header might not be mounted yet
 
     def _build_status_bar_text(self) -> str:
-        """Build the status bar text with sync times and mode."""
-        # PROD/MOCK indicator
-        db_indicator = "[yellow]MOCK[/yellow]" if self._is_mock else "[green]PROD[/green]"
+        """Build the status bar text with filter stats, sync times, and optional mock indicator."""
+        parts = []
 
-        # Get sync times via service layer (not direct DB access)
+        # Only show MOCK indicator when in mock mode (cleaner look for normal use)
+        if self._is_mock:
+            parts.append("[yellow]MOCK[/yellow]")
+
+        # Filter stats (moved from header-stats)
+        filter_label = self._get_filter_display_label()
+        parts.append(f"Filter: [b]{filter_label}[/b]")
+
+        # Transaction counts
+        if hasattr(self, "_transactions") and self._transactions:
+            total = self._transactions.total_count
+            uncategorized = sum(1 for t in self._transactions.transactions if t.is_uncategorized)
+            unapproved = sum(1 for t in self._transactions.transactions if t.is_unapproved)
+            parts.append(f"[b]{total}[/b] txns")
+            if uncategorized:
+                parts.append(f"[b]{uncategorized}[/b] uncat")
+            if unapproved:
+                parts.append(f"[b]{unapproved}[/b] unappr")
+
+        # Sync times
         sync_status = self._categorizer.get_sync_status()
         ynab_sync = sync_status["ynab"]
         amazon_sync = sync_status["amazon"]
 
         ynab_time = _format_sync_time(ynab_sync.get("last_sync_at") if ynab_sync else None)
         amazon_time = _format_sync_time(amazon_sync.get("last_sync_at") if amazon_sync else None)
+        parts.append(f"YNAB: {ynab_time}")
+        parts.append(f"Amazon: {amazon_time}")
 
-        return f"{db_indicator} | YNAB: {ynab_time} | Amazon: {amazon_time} | [b]?[/b] Help"
+        return " │ ".join(parts)
 
     def compose(self) -> ComposeResult:
         """Compose the UI."""
@@ -388,9 +415,19 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
 
     async def on_mount(self) -> None:
         """Handle app mount - load initial data."""
+        # Calculate initial column widths based on terminal size
+        self._column_widths = calculate_column_widths(self.size.width)
         # Initialize budget info
         await self._init_budget()
         self.run_worker(self._load_transactions())
+
+    def on_resize(self, event) -> None:
+        """Handle terminal resize - recalculate column widths."""
+        new_widths = calculate_column_widths(event.size.width)
+        if new_widths != self._column_widths:
+            self._column_widths = new_widths
+            # Re-render transactions with new widths
+            self.run_worker(self._render_transactions())
 
     async def _init_budget(self) -> None:
         """Initialize budget state from the YNAB client."""
@@ -455,50 +492,32 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         # Clear and rebuild content
         await container.remove_children()
 
-        # Stats header - show filter and counts
-        filter_label = self._get_filter_display_label()
-        # Count uncategorized in current view
-        uncategorized_count = sum(1 for t in self._transactions.transactions if t.is_uncategorized)
-        unapproved_count = sum(1 for t in self._transactions.transactions if t.is_unapproved)
-        stats = Horizontal(
-            Static(f"Filter: [b]{filter_label}[/b] (f)", classes="stat-box"),
-            Static(f"Showing: [b]{self._transactions.total_count}[/b]", classes="stat-box"),
-            Static(f"Uncategorized: [b]{uncategorized_count}[/b]", classes="stat-box"),
-            Static(f"Unapproved: [b]{unapproved_count}[/b]", classes="stat-box"),
-            id="header-stats",
-        )
-
         # Column header (separate from ListView)
         header_row = self._render_header_row()
 
         # Transaction list using ListView for efficient navigation
         items = [
-            TransactionListItem(txn, self._tag_state) for txn in self._transactions.transactions
+            TransactionListItem(
+                txn, self._tag_state, self._column_widths, self._color_status_letters
+            )
+            for txn in self._transactions.transactions
         ]
         txn_list = ListView(*items, id="transactions-list")
 
-        # Status bar with DB path and sync times
+        # Status bar with filter stats and sync times (consolidated)
         status = Static(
             self._build_status_bar_text(),
             id="status-bar",
         )
 
-        await container.mount(stats, header_row, txn_list, status)
+        await container.mount(header_row, txn_list, status)
 
         # Focus ListView for keyboard navigation
         txn_list.focus()
 
     def _render_header_row(self) -> Static:
         """Render the header row with column names."""
-        # Column widths: date(10) payee(22) amount(12) category(20) account(16) status(6)
-        header = (
-            f"{'Date':<10}  "
-            f"{'Payee':<22}  "
-            f"{'Amount':>12}  "
-            f"{'Category':<20}  "
-            f"{'Account':<16}  "
-            f"{'Status':<6}"
-        )
+        header = format_header_row(self._column_widths)
         return Static(header, classes="transaction-header")
 
     async def action_quit(self) -> None:

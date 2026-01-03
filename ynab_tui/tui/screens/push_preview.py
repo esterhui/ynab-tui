@@ -12,10 +12,14 @@ from textual.worker import Worker, WorkerState
 
 from ...services.sync import SyncService
 from ..constants import VIM_NAVIGATION_BINDINGS
+from ..layout import ColumnWidths
 from ..mixins import ListViewNavigationMixin
 
 if TYPE_CHECKING:
     from ...services import CategorizerService
+
+# Column widths for push preview (uses shared base values)
+_WIDTHS = ColumnWidths(payee=28, category=20, account=0)
 
 
 class PushChangeItem(ListItem):
@@ -37,16 +41,17 @@ class PushChangeItem(ListItem):
     def _format_row(self) -> str:
         """Format the pending change as a row string."""
         change = self.change
+        w = _WIDTHS
 
-        # Format date (10 chars)
-        date_str = str(change.get("date", ""))[:10]
+        # Format date (fixed width)
+        date_str = str(change.get("date", ""))[: w.date].ljust(w.date)
 
-        # Format payee (30 chars)
-        payee = (change.get("payee_name") or "Unknown")[:28].ljust(28)
+        # Format payee (dynamic width)
+        payee = (change.get("payee_name") or "Unknown")[: w.payee].ljust(w.payee)
 
-        # Format amount (12 chars, right-aligned)
+        # Format amount (fixed width, right-aligned)
         amount = change.get("amount", 0)
-        amount_str = f"${abs(amount):.2f}".rjust(10)
+        amount_str = f"${abs(amount):.2f}".rjust(w.amount)
 
         # Format change description based on what actually changed
         change_type = change.get("change_type", "category")
@@ -55,6 +60,9 @@ class PushChangeItem(ListItem):
 
         # Check what actually changed
         has_category_change = "category_id" in new_values or "category_name" in new_values
+
+        cat_width = w.category
+        half_cat = cat_width // 2 - 2  # For "old -> new" format
 
         if change_type == "split":
             # For splits, show simple indicator
@@ -70,13 +78,13 @@ class PushChangeItem(ListItem):
                 change.get("new_category_name") or new_values.get("category_name") or "Unknown"
             )
             if old_cat == new_cat:
-                change_desc = f"{new_cat[:20]}"
+                change_desc = f"{new_cat[:cat_width]}"
             else:
-                change_desc = f"{old_cat[:15]} -> {new_cat[:15]}"
+                change_desc = f"{old_cat[:half_cat]} -> {new_cat[:half_cat]}"
         else:
             # No category change - show transaction's actual category
             actual_cat = change.get("category_name") or "Uncategorized"
-            change_desc = f"{actual_cat[:20]}"
+            change_desc = f"{actual_cat[:cat_width]}"
 
         # Format approval change (+A or -A)
         approval_change = ""

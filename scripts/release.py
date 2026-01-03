@@ -13,8 +13,8 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
-from functools import total_ordering
 from datetime import date
+from functools import total_ordering
 from pathlib import Path
 
 # Rich is optional - gracefully degrade if not available
@@ -153,8 +153,6 @@ def get_current_version(root: Path) -> Version | None:
     return Version.parse(match.group(1))
 
 
-
-
 # =============================================================================
 # Git helpers
 # =============================================================================
@@ -201,7 +199,7 @@ def create_git_commit(root: Path, version: Version, dry_run: bool) -> bool:
     message = f"Release v{version}"
 
     if dry_run:
-        print_dry_run(f"Would commit: \"{message}\"")
+        print_dry_run(f'Would commit: "{message}"')
         return True
 
     try:
@@ -236,7 +234,7 @@ def create_git_commit(root: Path, version: Version, dry_run: bool) -> bool:
             print_error(f"Failed to commit: {result.stderr}")
             return False
 
-        print_success(f"Committed: \"{message}\"")
+        print_success(f'Committed: "{message}"')
         return True
     except subprocess.CalledProcessError as e:
         print_error(f"Git error: {e}")
@@ -327,8 +325,6 @@ def update_pyproject_version(
         print_success(f"Updated pyproject.toml → {new_version}")
 
     return True
-
-
 
 
 # =============================================================================
@@ -437,7 +433,7 @@ def test_wheel_install(root: Path, version: Version, dry_run: bool) -> bool:
             print_error(f"Smoke test failed (--help): {result.stderr}")
             return False
 
-        print_success(f"Wheel installs and runs correctly")
+        print_success("Wheel installs and runs correctly")
         return True
 
     finally:
@@ -563,15 +559,12 @@ Before running, make sure CHANGELOG.md has an entry for the new version.
     if existing_tags and not args.force:
         # Not first release - require version > current
         if not new_version > current_version:
-            print_error(
-                f"New version {new_version} must be greater than current "
-                f"{current_version}"
-            )
+            print_error(f"New version {new_version} must be greater than current {current_version}")
             print_info("Use --force to re-release the same version")
             return 1
         print_success(f"Version {new_version} > {current_version}")
     elif args.force:
-        print_success(f"Version check skipped (--force)")
+        print_success("Version check skipped (--force)")
     else:
         print_success("First release - skipping version comparison")
 

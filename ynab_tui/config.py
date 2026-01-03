@@ -78,6 +78,8 @@ class DisplayConfig:
     cli_category_width: int = 20
     # Search matching style: "substring" (default), "fuzzy" (fzf-style), "word_boundary"
     search_match_style: str = "substring"
+    # Color-code status letters (A, C, R, M, P, !) in transaction list
+    color_status_letters: bool = False
 
 
 @dataclass
@@ -222,6 +224,7 @@ def load_config(config_path: Optional[Path] = None) -> Config:
         cli_payee_width=display_data.get("cli_payee_width", 25),
         cli_category_width=display_data.get("cli_category_width", 20),
         search_match_style=display_data.get("search_match_style", "substring"),
+        color_status_letters=display_data.get("color_status_letters", False),
     )
 
     return Config(

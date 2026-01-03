@@ -68,3 +68,7 @@ cli_category_width = 20
 #   "word_boundary" - Fuzzy match prioritizing word starts
 #                     "mr" matches "Misc Rental" better than "smirk"
 search_match_style = "substring"
+
+# Color-code status letters (A=green, C=cyan, R=blue, M=yellow, P=magenta, !=red)
+# Default: false (plain text)
+color_status_letters = false
