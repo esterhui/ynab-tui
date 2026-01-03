@@ -289,7 +289,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         Binding("s", "settings", "Settings", show=False),
         Binding("u", "undo", "Undo", show=False),
         Binding("q", "quit", "Quit", show=False),
-        Binding("escape", "quit", "Quit", show=False),
+        Binding("escape", "escape_back", "Back", show=False),
         Binding("b", "switch_budget", "Budget", show=False),
         Binding("t", "toggle_tag", "Tag", show=False),
         Binding("T", "clear_all_tags", "Untag All", show=False),
@@ -519,6 +519,36 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
     async def action_quit(self) -> None:
         """Handle quit action."""
         self.exit()
+
+    def action_escape_back(self) -> None:
+        """Handle Escape key - progressively dismiss UI elements."""
+        # 1. Cancel filter submenu if active
+        if self._filter_state.is_submenu_active:
+            self._cancel_filter_pending()
+            return
+
+        # 2. Clear filters if any are applied
+        if self._has_active_filters():
+            self._clear_all_filters()
+            return
+
+        # 3. Otherwise quit
+        self.exit()
+
+    def _has_active_filters(self) -> bool:
+        """Check if any filters are currently applied."""
+        return (
+            self._filter_state.mode != "all"
+            or self._filter_state.category is not None
+            or self._filter_state.payee is not None
+        )
+
+    def _clear_all_filters(self) -> None:
+        """Clear all active filters and refresh."""
+        self._filter_state = FilterStateMachine.reset(self._filter_state)
+        self._restore_status_bar()
+        self.notify("Filters cleared", timeout=1)
+        self.run_worker(self._load_transactions(), exclusive=True)
 
     def action_refresh(self) -> None:
         """Refresh transactions."""
