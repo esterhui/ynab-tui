@@ -118,9 +118,14 @@ def format_header_row(widths: ColumnWidths) -> str:
         Formatted header string.
     """
     sp = " " * widths.col_spacing
+    # Align headers with data columns:
+    # - Data has tag (2 chars) + amazon indicator (2 chars) before payee text
+    # - Add 4 spaces before "Payee" to match, taking from payee column width
+    payee_padding = 4  # tag + amazon indicators
+    payee_col = (" " * payee_padding + "Payee").ljust(widths.payee)
     return (
         f"{'Date':<{widths.date}}{sp}"
-        f"{'Payee':<{widths.payee}}{sp}"
+        f"{payee_col}{sp}"
         f"{'Amount':>{widths.amount}}{sp}"
         f"{'Category':<{widths.category}}{sp}"
         f"{'Account':<{widths.account}}{sp}"

@@ -283,10 +283,10 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         Binding("f", "cycle_filter", "Filter"),
         Binding("/", "fuzzy_search", "Search"),
         Binding("p", "push_preview", "Push"),
-        Binding("s", "settings", "Settings"),
+        Binding("x", "split", "Split"),
         Binding("?", "show_help", "Help"),
         # Hidden actions (still work, not shown in footer)
-        Binding("x", "split", "Split", show=False),
+        Binding("s", "settings", "Settings", show=False),
         Binding("u", "undo", "Undo", show=False),
         Binding("q", "quit", "Quit", show=False),
         Binding("escape", "quit", "Quit", show=False),
@@ -392,15 +392,11 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             if unapproved:
                 parts.append(f"[b]{unapproved}[/b] unappr")
 
-        # Sync times
+        # Sync time (YNAB only)
         sync_status = self._categorizer.get_sync_status()
         ynab_sync = sync_status["ynab"]
-        amazon_sync = sync_status["amazon"]
-
         ynab_time = _format_sync_time(ynab_sync.get("last_sync_at") if ynab_sync else None)
-        amazon_time = _format_sync_time(amazon_sync.get("last_sync_at") if amazon_sync else None)
         parts.append(f"YNAB: {ynab_time}")
-        parts.append(f"Amazon: {amazon_time}")
 
         return " │ ".join(parts)
 
