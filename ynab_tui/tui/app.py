@@ -183,7 +183,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
 
     #header-stats {
         dock: top;
-        height: 3;
+        height: 1;
         background: $primary-background;
         padding: 0 1;
     }
@@ -459,23 +459,12 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         filter_label = self._get_filter_display_label()
         # Count uncategorized in current view
         uncategorized_count = sum(1 for t in self._transactions.transactions if t.is_uncategorized)
+        unapproved_count = sum(1 for t in self._transactions.transactions if t.is_unapproved)
         stats = Horizontal(
-            Static(
-                f"[b]{filter_label}[/b]\nFilter (f)",
-                classes="stat-box",
-            ),
-            Static(
-                f"[b]{self._transactions.total_count}[/b]\nShowing",
-                classes="stat-box",
-            ),
-            Static(
-                f"[b]{uncategorized_count}[/b]\nUncategorized",
-                classes="stat-box",
-            ),
-            Static(
-                f"[b]{self._transactions.amazon_count}[/b]\nAmazon",
-                classes="stat-box",
-            ),
+            Static(f"Filter: [b]{filter_label}[/b] (f)", classes="stat-box"),
+            Static(f"Showing: [b]{self._transactions.total_count}[/b]", classes="stat-box"),
+            Static(f"Uncategorized: [b]{uncategorized_count}[/b]", classes="stat-box"),
+            Static(f"Unapproved: [b]{unapproved_count}[/b]", classes="stat-box"),
             id="header-stats",
         )
 
