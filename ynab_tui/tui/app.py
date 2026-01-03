@@ -415,7 +415,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         self._column_widths = calculate_column_widths(self.size.width)
         # Initialize budget info
         await self._init_budget()
-        self.run_worker(self._load_transactions())
+        self.run_worker(self._load_transactions(), exclusive=True)
 
     def on_resize(self, event) -> None:
         """Handle terminal resize - recalculate column widths."""
@@ -423,7 +423,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         if new_widths != self._column_widths:
             self._column_widths = new_widths
             # Re-render transactions with new widths
-            self.run_worker(self._render_transactions())
+            self.run_worker(self._render_transactions(), exclusive=True)
 
     async def _init_budget(self) -> None:
         """Initialize budget state from the YNAB client."""
@@ -522,7 +522,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
 
     def action_refresh(self) -> None:
         """Refresh transactions."""
-        self.run_worker(self._load_transactions())
+        self.run_worker(self._load_transactions(), exclusive=True)
 
     def action_toggle_tag(self) -> None:
         """Toggle tag on the currently selected transaction for bulk actions."""
@@ -617,7 +617,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             self._filter_timer = None
         self._restore_status_bar()
         self.notify(f"Filter: {self._get_filter_display_label()}", timeout=2)
-        self.run_worker(self._load_transactions())
+        self.run_worker(self._load_transactions(), exclusive=True)
 
     def _get_filter_display_label(self) -> str:
         """Get the display label for current filter state including category/payee."""
@@ -762,7 +762,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                     item.update_content()  # Update the Static widget's text
         except Exception:
             # Fallback to full re-render if something goes wrong
-            self.run_worker(self._render_transactions())
+            self.run_worker(self._render_transactions(), exclusive=True)
 
     def _on_bulk_category_selected(self, result: Optional[CategorySelection]) -> None:
         """Handle category selection for bulk tagging."""
@@ -783,7 +783,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         self._tag_state = TagManager.clear_all(self._tag_state)
 
         # Refresh display
-        self.run_worker(self._render_transactions())
+        self.run_worker(self._render_transactions(), exclusive=True)
         self.notify(action_result.message)
 
     def action_fuzzy_search(self) -> None:
@@ -830,7 +830,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             if self._filter_state.category:
                 self._filter_state = FilterStateMachine.clear_category(self._filter_state)
                 self.notify("Category filter cleared", timeout=2)
-                self.run_worker(self._load_transactions())
+                self.run_worker(self._load_transactions(), exclusive=True)
             return
         # Convert modal result to our state type
         cat_filter = CategoryFilter(
@@ -839,7 +839,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         )
         self._filter_state = FilterStateMachine.set_category(self._filter_state, cat_filter)
         self.notify(f"Filtering by: {result.category_name}", timeout=2)
-        self.run_worker(self._load_transactions())
+        self.run_worker(self._load_transactions(), exclusive=True)
 
     def _open_payee_filter(self) -> None:
         """Open the payee filter modal."""
@@ -863,11 +863,11 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             if self._filter_state.payee:
                 self._filter_state = FilterStateMachine.clear_payee(self._filter_state)
                 self.notify("Payee filter cleared", timeout=2)
-                self.run_worker(self._load_transactions())
+                self.run_worker(self._load_transactions(), exclusive=True)
             return
         self._filter_state = FilterStateMachine.set_payee(self._filter_state, result)
         self.notify(f"Filtering by payee: {result}", timeout=2)
-        self.run_worker(self._load_transactions())
+        self.run_worker(self._load_transactions(), exclusive=True)
 
     def action_split(self) -> None:
         """Open split screen for Amazon transactions."""
@@ -961,7 +961,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                     item.update_content()
         except Exception:
             # Fallback to full re-render if something goes wrong
-            self.run_worker(self._render_transactions())
+            self.run_worker(self._render_transactions(), exclusive=True)
 
     def action_undo(self) -> None:
         """Undo pending category change on selected transaction."""
@@ -988,7 +988,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                         item.update_content()
             except Exception:
                 # Fallback to full re-render
-                self.run_worker(self._render_transactions())
+                self.run_worker(self._render_transactions(), exclusive=True)
         else:
             self.notify(action_result.error or "Failed to undo", severity="error")
 
@@ -1007,7 +1007,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             self._tag_state = TagManager.clear_all(self._tag_state)
 
             # Refresh display
-            self.run_worker(self._render_transactions())
+            self.run_worker(self._render_transactions(), exclusive=True)
             self.notify(action_result.message)
         else:
             # Single item mode
@@ -1034,7 +1034,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                             item.update_content()
                 except Exception:
                     # Fallback to full re-render
-                    self.run_worker(self._render_transactions())
+                    self.run_worker(self._render_transactions(), exclusive=True)
             else:
                 self.notify(action_result.error or "Failed to approve", severity="error")
 
@@ -1079,7 +1079,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                     if isinstance(item, TransactionListItem):
                         item.update_content()
             except Exception:
-                self.run_worker(self._render_transactions())
+                self.run_worker(self._render_transactions(), exclusive=True)
         else:
             self.notify(action_result.error or "Failed to update memo", severity="error")
 
@@ -1133,7 +1133,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         # Update header and reload transactions
         self._update_header()
         self.notify(f"Switched to: {result.budget_name}")
-        self.run_worker(self._load_transactions())
+        self.run_worker(self._load_transactions(), exclusive=True)
 
     def action_push_preview(self) -> None:
         """Show push preview screen with pending changes."""
