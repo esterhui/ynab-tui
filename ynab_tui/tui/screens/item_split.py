@@ -49,7 +49,7 @@ class SplitItemListItem(ListItem):
 
         # Status indicator and category
         if self.assigned_category:
-            status = "[*]"
+            status = "[✓]"
             cat_name = self.assigned_category.get("category_name", "")[:20]
             cat_str = f"[green]{cat_name}[/green]"
         else:
@@ -117,7 +117,7 @@ class ItemSplitScreen(ModalScreen[bool]):
         Binding("down", "cursor_down", "Down", show=False),
         Binding("up", "cursor_up", "Up", show=False),
         Binding("c", "categorize_item", "Categorize"),
-        Binding("enter", "submit_or_categorize", "Select/Submit", show=False),
+        Binding("enter", "categorize_or_advance", "Select", show=False),
         Binding("a", "apply_split", "Apply"),
         Binding("escape", "cancel", "Cancel"),
         Binding("q", "cancel", "Cancel", show=False),
@@ -149,6 +149,9 @@ class ItemSplitScreen(ModalScreen[bool]):
 
         # Track assignments: {index: {category_id, category_name}}
         self._assignments: dict[int, dict] = {}
+
+        # Store original splits for change detection
+        self._original_splits = existing_splits or []
 
         # Pre-populate assignments from existing pending splits
         if existing_splits:
@@ -342,22 +345,33 @@ class ItemSplitScreen(ModalScreen[bool]):
 
         # All categorized - stay on current
 
-    def action_submit_or_categorize(self) -> None:
-        """Enter key: categorize if uncategorized, submit if all done."""
-        idx = self._get_current_item_index()
+    def _splits_unchanged(self) -> bool:
+        """Check if current assignments match original splits."""
+        if not self._original_splits:
+            return False  # No original = always changed
 
-        # If current item uncategorized, categorize it
-        if idx is not None and idx not in self._assignments:
-            self.action_categorize_item()
-            return
+        # Build current splits for comparison
+        current = self._calculate_splits_with_remainder()
 
-        # If all items categorized, apply
-        if len(self._assignments) == len(self._items):
-            self.action_apply_split()
-        else:
-            # Move to next uncategorized
-            self._advance_to_next_uncategorized()
-            self.notify(f"{len(self._items) - len(self._assignments)} items still need categories")
+        # Compare by category_id and memo (item matching)
+        if len(current) != len(self._original_splits):
+            return False
+
+        # Create lookup from original splits
+        orig_by_memo = {s.get("memo", ""): s.get("category_id") for s in self._original_splits}
+
+        for split in current:
+            memo = split.get("memo", "")
+            if memo not in orig_by_memo:
+                return False
+            if orig_by_memo[memo] != split.get("category_id"):
+                return False
+
+        return True
+
+    def action_categorize_or_advance(self) -> None:
+        """Enter key: open categorizer for current item (same as 'c')."""
+        self.action_categorize_item()
 
     def action_apply_split(self) -> None:
         """Apply the split categorizations locally."""
@@ -365,6 +379,12 @@ class ItemSplitScreen(ModalScreen[bool]):
         if len(self._assignments) != len(self._items):
             uncategorized = len(self._items) - len(self._assignments)
             self.notify(f"{uncategorized} items still need categories", severity="warning")
+            return
+
+        # Check if splits actually changed - no-op if unchanged
+        if self._splits_unchanged():
+            self.notify("No changes to apply")
+            self.dismiss(True)  # Exit without modifying
             return
 
         # Calculate splits with distributed remainder

@@ -10,7 +10,6 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container
 from textual.css.query import NoMatches
-from textual.timer import Timer
 from textual.widgets import Footer, ListItem, ListView, Static
 
 from .. import __version__
@@ -259,6 +258,10 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         padding: 0 1;
     }
 
+    #status-bar.filter-active {
+        background: $warning-darken-2;
+    }
+
     #loading-indicator {
         width: 100%;
         height: 100%;
@@ -331,7 +334,6 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         self._transactions: TransactionBatch = TransactionBatch()
         # Filter state (immutable - replaced on changes)
         self._filter_state = FilterState()
-        self._filter_timer: Timer | None = None  # Timer to cancel pending state
         # Tag state (immutable - replaced on changes)
         self._tag_state = TagState()
         # Budget state - will be populated on mount
@@ -569,11 +571,6 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
 
     def action_cycle_filter(self) -> None:
         """Show filter menu in status bar and wait for sub-key."""
-        # Cancel any existing timer
-        if self._filter_timer is not None:
-            self._filter_timer.stop()
-            self._filter_timer = None
-
         # Enter filter submenu mode
         self._filter_state = FilterStateMachine.enter_submenu(self._filter_state)
         filter_text = (
@@ -587,22 +584,30 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             "[cyan]r[/cyan]eset"
         )
         self._update_status_bar(filter_text)
-
-        # Set timer to cancel pending state after 3 seconds
-        self._filter_timer = self.set_timer(3.0, self._cancel_filter_pending)
+        # Add visual indicator that filter menu is active
+        self._set_filter_menu_active(True)
 
     def _cancel_filter_pending(self) -> None:
-        """Cancel filter pending state after timeout."""
+        """Cancel filter pending state."""
         self._filter_state = FilterStateMachine.cancel_submenu(self._filter_state)
-        self._filter_timer = None
+        self._set_filter_menu_active(False)
         self._restore_status_bar()
+
+    def _set_filter_menu_active(self, active: bool) -> None:
+        """Toggle visual indicator for filter menu mode."""
+        try:
+            status_bar = self.query_one("#status-bar", Static)
+            if active:
+                status_bar.add_class("filter-active")
+            else:
+                status_bar.remove_class("filter-active")
+        except Exception:
+            pass  # Status bar might not exist yet
 
     def _apply_filter(self, filter_mode: str) -> None:
         """Apply a filter mode and reload transactions."""
         self._filter_state = FilterStateMachine.apply_mode(self._filter_state, filter_mode)
-        if self._filter_timer is not None:
-            self._filter_timer.stop()
-            self._filter_timer = None
+        self._set_filter_menu_active(False)
         self._restore_status_bar()
         self.notify(f"Filter: {self._get_filter_display_label()}", timeout=2)
         self.run_worker(self._load_transactions(), exclusive=True)
@@ -1156,6 +1161,9 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         """Handle Enter key on ListView - open category picker modal."""
+        # Only respond to events from the main transaction list, not child screens
+        if event.list_view.id != "transactions-list":
+            return
         # Same as pressing 'c' - open category picker for selected transaction
         self.action_categorize()
 
