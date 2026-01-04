@@ -127,7 +127,7 @@ class TestSplitItemListItem:
         category = {"category_id": "cat-1", "category_name": "Electronics"}
         item = SplitItemListItem(amazon_items[0], index=0, assigned_category=category)
         row = item._format_row()
-        assert "[*]" in row  # categorized indicator
+        assert "[✓]" in row  # categorized indicator
         assert "Electronics" in row
 
     def test_split_item_format_row_long_name(self):
