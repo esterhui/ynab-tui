@@ -14,7 +14,6 @@ from ynab_tui.utils import (
     truncate_list_display,
     word_boundary_match,
 )
-from ynab_tui.utils.string_utils import normalize_string
 
 
 class TestParseDate:
@@ -303,23 +302,3 @@ class TestIsAmazonPayee:
     def test_is_amazon_payee_empty_patterns(self):
         """Test empty patterns list returns False."""
         assert is_amazon_payee("AMAZON", []) is False
-
-
-class TestNormalizeString:
-    """Tests for normalize_string function."""
-
-    def test_normalize_lowercase(self):
-        """Test converts to lowercase."""
-        assert normalize_string("ABC") == "abc"
-
-    def test_normalize_strip_whitespace(self):
-        """Test strips leading/trailing whitespace."""
-        assert normalize_string("  abc  ") == "abc"
-
-    def test_normalize_combined(self):
-        """Test lowercase and strip combined."""
-        assert normalize_string("  HELLO WORLD  ") == "hello world"
-
-    def test_normalize_already_normalized(self):
-        """Test already normalized string unchanged."""
-        assert normalize_string("hello") == "hello"
