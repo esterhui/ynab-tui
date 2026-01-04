@@ -102,6 +102,9 @@ ynab-tui --version
 - `m` - Edit memo
 - `s` - Settings
 - `?` - Help
+- `Enter` - Categorize selected (same as `c`)
+- `Escape` - Quit (same as `q`)
+- `F5` - Refresh transactions
 - `q` - Quit
 
 ### CLI Commands

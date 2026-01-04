@@ -38,6 +38,9 @@ HELP_TEXT = """\
   /         Search
   b         Switch budget
   s         Settings
+  Enter     Categorize selected
+  Escape    Quit
+  F5        Refresh
   q         Quit
 
 [b]Status Flags:[/b]

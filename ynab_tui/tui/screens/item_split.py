@@ -118,7 +118,7 @@ class ItemSplitScreen(ModalScreen[bool]):
         Binding("up", "cursor_up", "Up", show=False),
         Binding("c", "categorize_item", "Categorize"),
         Binding("enter", "submit_or_categorize", "Select/Submit", show=False),
-        Binding("s", "submit_split", "Submit"),
+        Binding("a", "apply_split", "Apply"),
         Binding("escape", "cancel", "Cancel"),
         Binding("q", "cancel", "Cancel", show=False),
     ]
@@ -351,16 +351,16 @@ class ItemSplitScreen(ModalScreen[bool]):
             self.action_categorize_item()
             return
 
-        # If all items categorized, submit
+        # If all items categorized, apply
         if len(self._assignments) == len(self._items):
-            self.action_submit_split()
+            self.action_apply_split()
         else:
             # Move to next uncategorized
             self._advance_to_next_uncategorized()
             self.notify(f"{len(self._items) - len(self._assignments)} items still need categories")
 
-    def action_submit_split(self) -> None:
-        """Submit the split transaction."""
+    def action_apply_split(self) -> None:
+        """Apply the split categorizations locally."""
         # Validate all items are categorized
         if len(self._assignments) != len(self._items):
             uncategorized = len(self._items) - len(self._assignments)
@@ -376,7 +376,7 @@ class ItemSplitScreen(ModalScreen[bool]):
                 transaction=self._transaction,
                 splits=splits,
             )
-            self.notify(f"✓ Split into {len(splits)} categories!")
+            self.notify(f"✓ Applied {len(splits)} category splits")
             self.dismiss(True)  # Signal success to callback
 
         except Exception as e:
