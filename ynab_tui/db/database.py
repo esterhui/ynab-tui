@@ -328,12 +328,21 @@ class Database:
             ).fetchone()
             new_date = _date_str(txn.date)
             if existing:
+                # Check for pending changes - preserve local category if pending
+                pending = conn.execute(
+                    "SELECT new_category_id, new_category_name FROM pending_changes WHERE transaction_id=?",
+                    (txn.id,),
+                ).fetchone()
+                # Use pending category values if they exist, otherwise use YNAB values
+                final_category_id = pending["new_category_id"] if pending else txn.category_id
+                final_category_name = pending["new_category_name"] if pending else txn.category_name
+
                 data_changed = (
                     existing["date"] != new_date
                     or existing["amount"] != txn.amount
                     or existing["payee_name"] != txn.payee_name
-                    or existing["category_id"] != txn.category_id
-                    or existing["category_name"] != txn.category_name
+                    or existing["category_id"] != final_category_id
+                    or existing["category_name"] != final_category_name
                     or existing["memo"] != txn.memo
                     or existing["approved"] != txn.approved
                     or existing["transfer_account_id"] != txn.transfer_account_id
@@ -349,8 +358,8 @@ class Database:
                             txn.amount,
                             txn.payee_name,
                             txn.payee_id,
-                            txn.category_id,
-                            txn.category_name,
+                            final_category_id,
+                            final_category_name,
                             txn.account_name,
                             txn.account_id,
                             txn.memo,
@@ -562,12 +571,16 @@ class Database:
             ).fetchall()
             return [dict(row) for row in rows]
 
-    def mark_pending_split(self, transaction_id: str, splits: list[dict[str, Any]]) -> bool:
+    def mark_pending_split(
+        self, transaction_id: str, splits: list[dict[str, Any]], category_name: str | None = None
+    ) -> bool:
         """Mark a transaction as pending push with split information."""
+        # Use provided category_name or generate format [Split N]
+        split_category = category_name or f"[Split {len(splits)}]"
         with self._connection() as conn:
             cursor = conn.execute(
-                "UPDATE ynab_transactions SET category_name='Split (pending)', is_split=1, sync_status='pending_push', modified_at=? WHERE id=?",
-                (_now_iso(), transaction_id),
+                "UPDATE ynab_transactions SET category_name=?, is_split=1, sync_status='pending_push', modified_at=? WHERE id=?",
+                (split_category, _now_iso(), transaction_id),
             )
             if cursor.rowcount == 0:
                 return False

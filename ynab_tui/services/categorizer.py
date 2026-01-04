@@ -391,6 +391,7 @@ class CategorizerService:
         self._db.mark_pending_split(
             transaction_id=transaction.id,
             splits=splits,
+            category_name=split_category_name,
         )
 
         # Record each categorization in history for learning

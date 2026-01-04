@@ -334,7 +334,7 @@ class TestPendingSplits:
         stored = temp_db.get_ynab_transaction("txn-001")
         assert stored["sync_status"] == "pending_push"
         assert stored["is_split"] == 1
-        assert stored["category_name"] == "Split (pending)"
+        assert stored["category_name"] == "[Split 2]"
 
     def test_get_pending_splits(self, temp_db: Database) -> None:
         """Can get pending splits."""

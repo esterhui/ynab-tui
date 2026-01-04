@@ -715,16 +715,17 @@ def amazon_match(ctx, verbose):
 
 @main.command("pull")
 @click.option("--full", is_flag=True, help="Full pull instead of incremental")
-@click.option("--ynab-only", is_flag=True, help="Only pull YNAB transactions")
-@click.option("--amazon-only", is_flag=True, help="Only pull Amazon orders")
+@click.option("--ynab", is_flag=True, help="Only pull YNAB transactions")
+@click.option("--amazon", is_flag=True, help="Only pull Amazon orders")
 @click.option("--amazon-year", type=int, help="Specific year for Amazon orders")
 @click.option(
     "--since-days",
     type=int,
-    help="Only fetch Amazon orders from the last N days (ignores sync state)",
+    help="Only fetch orders/transactions from the last N days (ignores sync state)",
 )
+@click.option("--dry-run", is_flag=True, help="Show what would be pulled without making changes")
 @click.pass_context
-def pull(ctx, full, ynab_only, amazon_only, amazon_year, since_days):
+def pull(ctx, full, ynab, amazon, amazon_year, since_days, dry_run):
     """Pull data from YNAB and Amazon to local database.
 
     Downloads categories, transactions and orders to local SQLite for offline
@@ -736,10 +737,10 @@ def pull(ctx, full, ynab_only, amazon_only, amazon_year, since_days):
     config = ctx.obj["config"]
     sync_overlap_days = config.categorization.sync_overlap_days
 
-    # If --budget was specified, imply --ynab-only (Amazon isn't budget-specific)
+    # If --budget was specified, imply --ynab (Amazon isn't budget-specific)
     budget_specified = ctx.obj.get("budget_specified", False)
-    if budget_specified and not amazon_only:
-        if not ynab_only:
+    if budget_specified and not amazon:
+        if not ynab:
             click.echo(
                 click.style(
                     "Note: --budget specified, pulling YNAB data only "
@@ -747,12 +748,15 @@ def pull(ctx, full, ynab_only, amazon_only, amazon_year, since_days):
                     fg="cyan",
                 )
             )
-        ynab_only = True
+        ynab = True
 
     sync_service = get_sync_service(ctx)
 
+    if dry_run:
+        click.echo(click.style("DRY RUN - no changes will be made\n", fg="yellow", bold=True))
+
     # Show which budget we're pulling for
-    if not amazon_only:
+    if not amazon:
         try:
             budget_name = sync_service._ynab.get_budget_name()
             click.echo(f"Budget: {click.style(budget_name, fg='green')}\n")
@@ -762,9 +766,9 @@ def pull(ctx, full, ynab_only, amazon_only, amazon_year, since_days):
     results = {}
 
     # Pull categories (always, unless amazon-only)
-    if not amazon_only:
+    if not amazon:
         click.echo("Pulling YNAB categories...")
-        result = sync_service.pull_categories()
+        result = sync_service.pull_categories(dry_run=dry_run)
         results["categories"] = result
 
         if result.success:
@@ -775,25 +779,27 @@ def pull(ctx, full, ynab_only, amazon_only, amazon_year, since_days):
             click.echo(click.style(f"  ✗ Error: {result.errors}", fg="red"))
 
     # Pull YNAB transactions
-    if not amazon_only:
+    if not amazon:
         click.echo("\nPulling YNAB transactions...")
         ynab_state = sync_service._db.get_sync_state("ynab")
-        if ynab_state and ynab_state.get("last_sync_at") and not full:
+        if since_days:
+            click.echo(f"  Fetching last {since_days} days")
+        elif ynab_state and ynab_state.get("last_sync_at") and not full:
             from datetime import timedelta
 
             click.echo(f"  Last sync: {ynab_state['last_sync_at'].strftime('%Y-%m-%d %H:%M')}")
-            since_date = (
+            fetch_since = (
                 ynab_state["last_sync_date"] - timedelta(days=sync_overlap_days)
                 if ynab_state.get("last_sync_date")
                 else "all"
             )
-            click.echo(f"  Fetching since: {since_date}")
+            click.echo(f"  Fetching since: {fetch_since}")
         elif full:
             click.echo("  Full sync requested")
         else:
             click.echo("  First sync - fetching all transactions")
 
-        result = sync_service.pull_ynab(full=full)
+        result = sync_service.pull_ynab(full=full, since_days=since_days, dry_run=dry_run)
         results["ynab"] = result
 
         if result.success:
@@ -808,12 +814,12 @@ def pull(ctx, full, ynab_only, amazon_only, amazon_year, since_days):
             click.echo(click.style(f"  ✗ Error: {result.errors}", fg="red"))
 
     # Pull Amazon
-    if not ynab_only:
+    if not ynab:
         mock = ctx.obj.get("mock", False)
         has_amazon_creds = mock or (config.amazon.username and config.amazon.password)
 
         if not has_amazon_creds:
-            if amazon_only:
+            if amazon:
                 # User explicitly requested Amazon-only but no credentials
                 click.echo(click.style("\nError: Amazon credentials not configured.", fg="red"))
                 click.echo("Set AMAZON_USERNAME and AMAZON_PASSWORD environment variables")
@@ -844,7 +850,9 @@ def pull(ctx, full, ynab_only, amazon_only, amazon_year, since_days):
             else:
                 click.echo("  First sync - fetching all orders")
 
-            result = sync_service.pull_amazon(full=full, year=amazon_year, since_days=since_days)
+            result = sync_service.pull_amazon(
+                full=full, year=amazon_year, since_days=since_days, dry_run=dry_run
+            )
             results["amazon"] = result
 
             if result.success:
