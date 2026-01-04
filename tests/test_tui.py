@@ -392,7 +392,8 @@ class TestRefreshAfterPush:
             )
             tui_database.upsert_ynab_transaction(txn)
 
-        return YNABCategorizerApp(categorizer=tui_categorizer, is_mock=True)
+        # Use load_since_months=None to load all transactions regardless of date
+        return YNABCategorizerApp(categorizer=tui_categorizer, is_mock=True, load_since_months=None)
 
     async def test_refresh_after_push_updates_listview_items(self, tui_app_with_transactions):
         """Test that _refresh_after_push updates matching ListView items."""
@@ -404,24 +405,22 @@ class TestRefreshAfterPush:
         async with app.run_test() as pilot:
             await pilot.pause()
             await app.workers.wait_for_complete()
+            # Additional pause to ensure UI has rendered after worker completes
+            await pilot.pause()
 
-            # Get ListView and check if it has any children
-            try:
-                txn_list = app.query_one("#transactions-list", ListView)
-            except Exception:
-                pytest.skip("No ListView available")
-
-            if not list(txn_list.children):
-                pytest.skip("No transactions in ListView")
+            # Get ListView
+            txn_list = app.query_one("#transactions-list", ListView)
+            assert list(txn_list.children), "ListView should have transactions"
 
             # Find a TransactionListItem and mark it as pending
+            txn_item = None
             for child in txn_list.children:
                 if isinstance(child, TransactionListItem):
-                    child.txn.sync_status = "pending_push"
-                    pushed_id = child.txn.id
+                    txn_item = child
                     break
-            else:
-                pytest.skip("No TransactionListItem found")
+            assert txn_item is not None, "Should have TransactionListItem"
+            txn_item.txn.sync_status = "pending_push"
+            pushed_id = txn_item.txn.id
 
             # Call _refresh_after_push
             await app._refresh_after_push([pushed_id])
