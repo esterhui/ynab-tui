@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Callable, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 from tqdm import tqdm
 
@@ -21,6 +21,32 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from ..clients import AmazonClient, MockAmazonClient, MockYNABClient, YNABClient
     from ..db.database import Database
+
+
+@dataclass
+class CategoryDetail:
+    """Category info for dry-run display."""
+
+    name: str
+    group_name: str
+
+
+@dataclass
+class TransactionDetail:
+    """Transaction info for dry-run display."""
+
+    date: datetime
+    payee_name: str
+    amount: float  # In dollars, not milliunits
+
+
+@dataclass
+class AmazonOrderDetail:
+    """Amazon order info for dry-run display."""
+
+    order_id: str
+    order_date: datetime
+    total: float
 
 
 @dataclass
@@ -36,6 +62,9 @@ class PullResult:
     # Date range of fetched records
     oldest_date: Optional[datetime] = None
     newest_date: Optional[datetime] = None
+    # Detailed items for dry-run display
+    details_to_insert: list[Any] = field(default_factory=list)
+    details_to_update: list[Any] = field(default_factory=list)
 
     @property
     def success(self) -> bool:
@@ -163,8 +192,31 @@ class SyncService:
                     result.inserted = inserted
                     result.updated = updated
                 else:
-                    # Dry run - estimate what would be inserted/updated
-                    result.inserted = result.fetched  # Approximate
+                    # Dry run - compare fetched with database to get accurate counts
+                    for txn in transactions:
+                        existing = self._db.get_ynab_transaction(txn.id)
+                        # Amount is in milliunits, convert to dollars for display
+                        detail = TransactionDetail(
+                            date=txn.date,
+                            payee_name=txn.payee_name or "",
+                            amount=txn.amount / 1000.0,
+                        )
+                        if existing:
+                            # Check if data would change (simplified comparison)
+                            new_date = txn.date.strftime("%Y-%m-%d")
+                            if (
+                                existing["date"][:10] != new_date
+                                or existing["amount"] != txn.amount
+                                or existing["payee_name"] != txn.payee_name
+                                or existing["category_id"] != txn.category_id
+                                or existing["memo"] != txn.memo
+                                or existing["approved"] != txn.approved
+                            ):
+                                result.updated += 1
+                                result.details_to_update.append(detail)
+                        else:
+                            result.inserted += 1
+                            result.details_to_insert.append(detail)
 
             # Update sync state (skip in dry run)
             result.total = self._db.get_transaction_count()
@@ -260,8 +312,23 @@ class SyncService:
                 if orders or result.total > 0:
                     self._db.update_sync_state("amazon", datetime.now(), result.total)
             else:
-                # Dry run - estimate what would be inserted
-                result.inserted = result.fetched  # Approximate
+                # Dry run - compare fetched with database to get accurate counts
+                for order in orders:
+                    existing = self._db.get_cached_order(order.order_id)
+                    detail = AmazonOrderDetail(
+                        order_id=order.order_id,
+                        order_date=order.order_date,
+                        total=order.total,
+                    )
+                    if existing:
+                        # Check if data would change
+                        new_date = order.order_date.strftime("%Y-%m-%d")
+                        if existing["order_date"] != new_date or existing["total"] != order.total:
+                            result.updated += 1
+                            result.details_to_update.append(detail)
+                    else:
+                        result.inserted += 1
+                        result.details_to_insert.append(detail)
                 result.total = self._db.get_order_count()
 
         except Exception as e:
@@ -300,8 +367,24 @@ class SyncService:
                 result.total = self._db.get_category_count()
                 self._db.update_sync_state("categories", datetime.now(), result.total)
             else:
-                # Dry run - estimate what would be inserted
-                result.inserted = result.fetched  # Approximate
+                # Dry run - compare fetched with database to get accurate counts
+                for group in category_list.groups:
+                    for cat in group.categories:
+                        existing = self._db.get_category_by_id(cat.id)
+                        detail = CategoryDetail(name=cat.name, group_name=group.name)
+                        if existing:
+                            # Check if data would change
+                            if (
+                                existing["name"] != cat.name
+                                or existing["group_name"] != group.name
+                                or existing["hidden"] != cat.hidden
+                                or existing["deleted"] != cat.deleted
+                            ):
+                                result.updated += 1
+                                result.details_to_update.append(detail)
+                        else:
+                            result.inserted += 1
+                            result.details_to_insert.append(detail)
                 result.total = self._db.get_category_count()
 
         except Exception as e:

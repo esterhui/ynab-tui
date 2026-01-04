@@ -11,6 +11,9 @@ import click
 from . import __version__
 from .cli import (
     display_amazon_match_results,
+    display_dry_run_amazon,
+    display_dry_run_categories,
+    display_dry_run_transactions,
     display_pending_changes,
     format_date_for_display,
     get_categorizer,
@@ -775,6 +778,8 @@ def pull(ctx, full, ynab, amazon, amazon_year, since_days, dry_run):
             click.echo(click.style(f"  ✓ Fetched {result.fetched} categories", fg="green"))
             click.echo(f"    Inserted: {result.inserted}, Updated: {result.updated}")
             click.echo(f"    Total in database: {result.total}")
+            if dry_run:
+                display_dry_run_categories(result)
         else:
             click.echo(click.style(f"  ✗ Error: {result.errors}", fg="red"))
 
@@ -810,6 +815,8 @@ def pull(ctx, full, ynab, amazon, amazon_year, since_days, dry_run):
                 )
             click.echo(f"    Inserted: {result.inserted}, Updated: {result.updated}")
             click.echo(f"    Total in database: {result.total}")
+            if dry_run:
+                display_dry_run_transactions(result)
         else:
             click.echo(click.style(f"  ✗ Error: {result.errors}", fg="red"))
 
@@ -863,6 +870,8 @@ def pull(ctx, full, ynab, amazon, amazon_year, since_days, dry_run):
                     )
                 click.echo(f"    Inserted: {result.inserted}, Updated: {result.updated}")
                 click.echo(f"    Total in database: {result.total}")
+                if dry_run:
+                    display_dry_run_amazon(result)
             else:
                 click.echo(click.style(f"  ✗ Error: {result.errors}", fg="red"))
 

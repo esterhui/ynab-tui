@@ -6,6 +6,9 @@ Commands are defined in src/main.py.
 
 from .formatters import (
     display_amazon_match_results,
+    display_dry_run_amazon,
+    display_dry_run_categories,
+    display_dry_run_transactions,
     echo_error,
     echo_header,
     echo_success,
@@ -26,6 +29,9 @@ from .helpers import (
 
 __all__ = [
     "display_amazon_match_results",
+    "display_dry_run_amazon",
+    "display_dry_run_categories",
+    "display_dry_run_transactions",
     "display_pending_changes",
     "echo_error",
     "echo_header",

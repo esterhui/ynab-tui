@@ -757,6 +757,15 @@ class Database:
                 fetched_at=datetime.fromisoformat(order_row["fetched_at"]),
             )
 
+    def get_cached_order(self, order_id: str) -> Optional[dict[str, Any]]:
+        """Get a cached Amazon order by ID."""
+        with self._connection() as conn:
+            row = conn.execute(
+                "SELECT order_id, order_date, total FROM amazon_orders_cache WHERE order_id = ?",
+                (order_id,),
+            ).fetchone()
+            return dict(row) if row else None
+
     def upsert_amazon_order_items(self, order_id: str, items: list[dict[str, Any]]) -> int:
         """Store Amazon order items for category matching."""
         with self._connection() as conn:

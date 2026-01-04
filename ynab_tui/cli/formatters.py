@@ -3,7 +3,14 @@
 Extracts display/formatting logic from main.py for better maintainability.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import click
+
+if TYPE_CHECKING:
+    from ynab_tui.services.sync import PullResult
 
 
 def format_sync_time(sync_state: dict | None) -> str:
@@ -316,3 +323,90 @@ def display_amazon_match_results(
         summary_parts.append(f"{len(result.unmatched_orders)} unmatched orders")
 
     click.echo(f"Summary: {', '.join(summary_parts)}")
+
+
+# =============================================================================
+# Dry-Run Display Helpers
+# =============================================================================
+
+
+def display_dry_run_categories(result: PullResult) -> None:
+    """Display dry-run category details.
+
+    Args:
+        result: PullResult with details_to_insert and details_to_update populated.
+    """
+    if not result.details_to_insert and not result.details_to_update:
+        return
+
+    if result.details_to_insert:
+        click.echo(click.style("\n  Would INSERT:", fg="green"))
+        click.echo(f"  {'Name':<30} {'Group':<25}")
+        click.echo("  " + "-" * 55)
+        for cat in result.details_to_insert:
+            name = cat.name[:30]
+            group = cat.group_name[:25]
+            click.echo(f"  {name:<30} {group:<25}")
+
+    if result.details_to_update:
+        click.echo(click.style("\n  Would UPDATE:", fg="yellow"))
+        click.echo(f"  {'Name':<30} {'Group':<25}")
+        click.echo("  " + "-" * 55)
+        for cat in result.details_to_update:
+            name = cat.name[:30]
+            group = cat.group_name[:25]
+            click.echo(f"  {name:<30} {group:<25}")
+
+
+def display_dry_run_transactions(result: PullResult) -> None:
+    """Display dry-run transaction details.
+
+    Args:
+        result: PullResult with details_to_insert and details_to_update populated.
+    """
+    if not result.details_to_insert and not result.details_to_update:
+        return
+
+    if result.details_to_insert:
+        click.echo(click.style("\n  Would INSERT:", fg="green"))
+        click.echo(f"  {'Date':<12} {'Payee':<30} {'Amount':>12}")
+        click.echo("  " + "-" * 55)
+        for txn in result.details_to_insert:
+            date_str = txn.date.strftime("%Y-%m-%d")
+            payee = (txn.payee_name or "")[:30]
+            click.echo(f"  {date_str:<12} {payee:<30} ${txn.amount:>10,.2f}")
+
+    if result.details_to_update:
+        click.echo(click.style("\n  Would UPDATE:", fg="yellow"))
+        click.echo(f"  {'Date':<12} {'Payee':<30} {'Amount':>12}")
+        click.echo("  " + "-" * 55)
+        for txn in result.details_to_update:
+            date_str = txn.date.strftime("%Y-%m-%d")
+            payee = (txn.payee_name or "")[:30]
+            click.echo(f"  {date_str:<12} {payee:<30} ${txn.amount:>10,.2f}")
+
+
+def display_dry_run_amazon(result: PullResult) -> None:
+    """Display dry-run Amazon order details.
+
+    Args:
+        result: PullResult with details_to_insert and details_to_update populated.
+    """
+    if not result.details_to_insert and not result.details_to_update:
+        return
+
+    if result.details_to_insert:
+        click.echo(click.style("\n  Would INSERT:", fg="green"))
+        click.echo(f"  {'Order ID':<20} {'Date':<12} {'Total':>12}")
+        click.echo("  " + "-" * 45)
+        for order in result.details_to_insert:
+            date_str = order.order_date.strftime("%Y-%m-%d")
+            click.echo(f"  {order.order_id:<20} {date_str:<12} ${order.total:>10,.2f}")
+
+    if result.details_to_update:
+        click.echo(click.style("\n  Would UPDATE:", fg="yellow"))
+        click.echo(f"  {'Order ID':<20} {'Date':<12} {'Total':>12}")
+        click.echo("  " + "-" * 45)
+        for order in result.details_to_update:
+            date_str = order.order_date.strftime("%Y-%m-%d")
+            click.echo(f"  {order.order_id:<20} {date_str:<12} ${order.total:>10,.2f}")
