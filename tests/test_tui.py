@@ -369,6 +369,125 @@ class TestTUIPushPreview:
             assert db.get_pending_change_count() == 1
 
 
+class TestRefreshAfterPush:
+    """Test _refresh_after_push method for incremental UI updates."""
+
+    @pytest.fixture
+    def tui_app_with_transactions(self, tui_categorizer, tui_database):
+        """Create TUI app with test transactions in the database."""
+        # Create test transactions
+        for i in range(4):
+            txn = Transaction(
+                id=f"txn-test-{i}",
+                date=datetime(2025, 1, 15),
+                amount=-50.00 * (i + 1),
+                payee_name=f"Test Payee {i}",
+                payee_id=f"payee-{i}",
+                account_name="Checking",
+                account_id="acc-001",
+                approved=True,
+                category_id=f"cat-{i}",
+                category_name=f"Category {i}",
+                sync_status="pending_push" if i < 2 else "synced",
+            )
+            tui_database.upsert_ynab_transaction(txn)
+
+        return YNABCategorizerApp(categorizer=tui_categorizer, is_mock=True)
+
+    async def test_refresh_after_push_updates_listview_items(self, tui_app_with_transactions):
+        """Test that _refresh_after_push updates matching ListView items."""
+        from textual.widgets import ListView
+
+        from ynab_tui.tui.app import TransactionListItem
+
+        app = tui_app_with_transactions
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await app.workers.wait_for_complete()
+
+            # Get ListView and check if it has any children
+            try:
+                txn_list = app.query_one("#transactions-list", ListView)
+            except Exception:
+                pytest.skip("No ListView available")
+
+            if not list(txn_list.children):
+                pytest.skip("No transactions in ListView")
+
+            # Find a TransactionListItem and mark it as pending
+            for child in txn_list.children:
+                if isinstance(child, TransactionListItem):
+                    child.txn.sync_status = "pending_push"
+                    pushed_id = child.txn.id
+                    break
+            else:
+                pytest.skip("No TransactionListItem found")
+
+            # Call _refresh_after_push
+            await app._refresh_after_push([pushed_id])
+
+            # Verify the item was updated
+            for child in txn_list.children:
+                if isinstance(child, TransactionListItem) and child.txn.id == pushed_id:
+                    assert child.txn.sync_status == "synced"
+                    break
+
+    async def test_refresh_after_push_preserves_selection(self, tui_app_with_transactions):
+        """Test that _refresh_after_push preserves current selection."""
+        app = tui_app_with_transactions
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await app.workers.wait_for_complete()
+
+            from textual.widgets import ListView
+
+            txn_list = app.query_one("#transactions-list", ListView)
+
+            # Navigate down 2 rows
+            await pilot.press("j")
+            await pilot.pause()
+            await pilot.press("j")
+            await pilot.pause()
+
+            original_index = txn_list.index
+
+            # Call _refresh_after_push with one of the transaction IDs
+            await app._refresh_after_push(["txn-test-0"])
+
+            # Selection should be preserved
+            assert txn_list.index == original_index
+
+    async def test_refresh_after_push_with_empty_list(self, tui_app_with_transactions):
+        """Test that _refresh_after_push handles empty pushed_ids gracefully."""
+        app = tui_app_with_transactions
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await app.workers.wait_for_complete()
+
+            original_count = len(app._transactions.transactions)
+
+            # Should not crash with empty list
+            await app._refresh_after_push([])
+
+            # State should be unchanged
+            assert len(app._transactions.transactions) == original_count
+
+    async def test_refresh_after_push_with_nonexistent_ids(self, tui_app_with_transactions):
+        """Test that _refresh_after_push handles IDs not in view."""
+        app = tui_app_with_transactions
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await app.workers.wait_for_complete()
+
+            original_count = len(app._transactions.transactions)
+
+            # Should not crash with IDs that don't exist
+            await app._refresh_after_push(["nonexistent-id-1", "nonexistent-id-2"])
+
+            # State should be unchanged
+            assert len(app._transactions.transactions) == original_count
+
+
 class TestTUISplitTransaction:
     """Test split transaction functionality."""
 

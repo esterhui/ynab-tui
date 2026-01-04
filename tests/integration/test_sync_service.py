@@ -618,6 +618,50 @@ class TestPushYnab:
         assert len(progress_calls) == 3
         assert progress_calls[-1] == (3, 3)
 
+    def test_pushed_ids_populated(
+        self, temp_db: Database, mock_ynab: MockYNABClient, mock_amazon: MockAmazonClient
+    ) -> None:
+        """Verifies pushed_ids contains successfully pushed transaction IDs."""
+        # Add transactions with pending changes
+        for i in range(3):
+            txn = make_transaction(id=f"txn-{i}")
+            mock_ynab.transactions.append(txn)
+            temp_db.upsert_ynab_transaction(txn)
+            temp_db.create_pending_change(
+                f"txn-{i}",
+                {"category_id": "cat-1", "approved": True},
+                {"category_id": None},
+                "update",
+            )
+
+        service = SyncService(temp_db, mock_ynab, mock_amazon)
+        result = service.push_ynab()
+
+        assert result.succeeded == 3
+        assert len(result.pushed_ids) == 3
+        assert set(result.pushed_ids) == {"txn-0", "txn-1", "txn-2"}
+
+    def test_pushed_ids_empty_when_dry_run(
+        self, temp_db: Database, mock_ynab: MockYNABClient, mock_amazon: MockAmazonClient
+    ) -> None:
+        """Verifies pushed_ids is empty on dry run."""
+        txn = make_transaction()
+        mock_ynab.transactions = [txn]
+        temp_db.upsert_ynab_transaction(txn)
+        temp_db.create_pending_change(
+            "txn-001",
+            {"category_id": "cat-1", "approved": True},
+            {"category_id": None},
+            "update",
+        )
+
+        service = SyncService(temp_db, mock_ynab, mock_amazon)
+        result = service.push_ynab(dry_run=True)
+
+        assert result.pushed == 1
+        assert result.succeeded == 0
+        assert len(result.pushed_ids) == 0
+
 
 class TestBuildPushSummary:
     """Tests for _build_push_summary method."""

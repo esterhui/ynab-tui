@@ -506,6 +506,61 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         header = format_header_row(self._column_widths)
         return Static(header, classes="transaction-header")
 
+    async def _refresh_after_push(self, pushed_ids: list[str]) -> None:
+        """Refresh UI after push without full rebuild.
+
+        Updates only affected rows and preserves current selection.
+
+        Args:
+            pushed_ids: Transaction IDs that were successfully pushed.
+        """
+        if not pushed_ids:
+            return
+
+        pushed_id_set = set(pushed_ids)
+
+        try:
+            txn_list = self.query_one("#transactions-list", ListView)
+        except NoMatches:
+            await self._load_transactions()  # Fallback
+            return
+
+        current_index = txn_list.index
+
+        # Handle "pending" filter - items should be removed from view
+        if self._filter_state.mode == "pending":
+            items_to_remove = [
+                child
+                for child in txn_list.children
+                if isinstance(child, TransactionListItem) and child.txn.id in pushed_id_set
+            ]
+            for item in items_to_remove:
+                await item.remove()
+
+            # Update cached transaction list
+            self._transactions.transactions = [
+                t for t in self._transactions.transactions if t.id not in pushed_id_set
+            ]
+
+            # Restore selection (same index or adjust if out of bounds)
+            remaining = len(list(txn_list.children))
+            if remaining > 0:
+                txn_list.index = min(current_index or 0, remaining - 1)
+        else:
+            # Other filters: update sync_status on affected rows
+            for child in txn_list.children:
+                if isinstance(child, TransactionListItem) and child.txn.id in pushed_id_set:
+                    child.txn.sync_status = "synced"
+                    # Also update cached list
+                    for txn in self._transactions.transactions:
+                        if txn.id == child.txn.id:
+                            txn.sync_status = "synced"
+                            break
+                    child.update_content()
+
+        # Update status bar
+        self._restore_status_bar()
+
     async def action_quit(self) -> None:
         """Handle quit action."""
         self.exit()

@@ -254,6 +254,7 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
             "succeeded": result.succeeded,
             "failed": result.failed,
             "errors": result.errors,
+            "pushed_ids": result.pushed_ids,
         }
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
@@ -280,8 +281,11 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
             # Pop screen first
             self.app.pop_screen()
 
-            # Reload transactions to apply current filter (removes pushed items from view)
-            self.app.run_worker(self.app._load_transactions())  # type: ignore[attr-defined]
+            # Incrementally refresh affected rows (avoids full rebuild flicker)
+            pushed_ids = result.get("pushed_ids", [])
+            self.app.run_worker(
+                self.app._refresh_after_push(pushed_ids)  # type: ignore[attr-defined]
+            )
 
         elif event.state == WorkerState.ERROR:
             self._hide_progress_bar()

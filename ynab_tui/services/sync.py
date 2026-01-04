@@ -51,6 +51,7 @@ class PushResult:
     succeeded: int = 0
     failed: int = 0
     errors: list[str] = field(default_factory=list)
+    pushed_ids: list[str] = field(default_factory=list)  # Successfully pushed IDs
     summary: str = ""  # Human-readable summary of pending changes
 
     @property
@@ -392,6 +393,7 @@ class SyncService:
                         # Apply change to ynab_transactions and cleanup pending_changes
                         self._db.apply_pending_change(txn_id)
                         result.succeeded += 1
+                        result.pushed_ids.append(txn_id)
                     else:
                         # YNAB returned different data than expected - keep in pending
                         result.failed += 1
