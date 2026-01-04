@@ -10,6 +10,7 @@ Handles connection management and provides query methods for:
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta
@@ -27,6 +28,8 @@ __all__ = [
     "CategorizationRecord",
     "TransactionFilter",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 def _now_iso() -> str:
@@ -333,9 +336,29 @@ class Database:
                     "SELECT new_category_id, new_category_name FROM pending_changes WHERE transaction_id=?",
                     (txn.id,),
                 ).fetchone()
+
+                # Conflict detection: local has category, YNAB says uncategorized, no pending
+                # This protects against YNAB resetting categories (e.g., bank re-import)
+                is_conflict = False
+                if not pending and existing["category_id"] and not txn.category_id:
+                    # Keep local category, mark as conflict
+                    is_conflict = True
+                    logger.warning(
+                        f"Conflict detected for {txn.id}: keeping local category "
+                        f"'{existing['category_name']}' (YNAB returned uncategorized)"
+                    )
+
                 # Use pending category values if they exist, otherwise use YNAB values
-                final_category_id = pending["new_category_id"] if pending else txn.category_id
-                final_category_name = pending["new_category_name"] if pending else txn.category_name
+                # BUT if conflict, preserve local category
+                if pending:
+                    final_category_id = pending["new_category_id"]
+                    final_category_name = pending["new_category_name"]
+                elif is_conflict:
+                    final_category_id = existing["category_id"]
+                    final_category_name = existing["category_name"]
+                else:
+                    final_category_id = txn.category_id
+                    final_category_name = txn.category_name
 
                 data_changed = (
                     existing["date"] != new_date
@@ -347,12 +370,17 @@ class Database:
                     or existing["approved"] != txn.approved
                     or existing["transfer_account_id"] != txn.transfer_account_id
                 )
-                if data_changed:
+                # Also update if conflict detected (to set sync_status)
+                needs_update = data_changed or is_conflict
+                if needs_update:
+                    # Set sync_status to 'conflict' if conflict detected, otherwise keep 'synced'
+                    new_sync_status = "conflict" if is_conflict else "synced"
                     conn.execute(
                         """UPDATE ynab_transactions SET date=?, amount=?, payee_name=?, payee_id=?,
                         category_id=?, category_name=?, account_name=?, account_id=?, memo=?, cleared=?, approved=?,
                         is_split=?, parent_transaction_id=?, synced_at=?, transfer_account_id=?, transfer_account_name=?,
-                        debt_transaction_type=?, budget_id=COALESCE(?, budget_id) WHERE id=? AND sync_status='synced'""",
+                        debt_transaction_type=?, budget_id=COALESCE(?, budget_id), sync_status=?
+                        WHERE id=? AND sync_status IN ('synced', 'conflict')""",
                         (
                             new_date,
                             txn.amount,
@@ -372,10 +400,11 @@ class Database:
                             txn.transfer_account_name,
                             txn.debt_transaction_type,
                             budget_id,
+                            new_sync_status,
                             txn.id,
                         ),
                     )
-                inserted, changed = False, data_changed
+                inserted, changed = False, needs_update
             else:
                 conn.execute(
                     """INSERT INTO ynab_transactions (id, budget_id, date, amount, payee_name, payee_id,

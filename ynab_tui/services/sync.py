@@ -499,6 +499,18 @@ class SyncService:
                         if "approved" in new_values:
                             verified = verified and (updated_txn.approved == new_values["approved"])
 
+                        # Log push verification result for debugging
+                        logger.info(
+                            f"Push {txn_id}: sent category={new_values.get('category_id')}, "
+                            f"received category={updated_txn.category_id}, verified={verified}"
+                        )
+                        if not verified:
+                            logger.warning(
+                                f"Push verification FAILED for {txn_id}: "
+                                f"sent={new_values}, received category={updated_txn.category_id}, "
+                                f"approved={updated_txn.approved}"
+                            )
+
                     if verified:
                         # Apply change to ynab_transactions and cleanup pending_changes
                         self._db.apply_pending_change(txn_id)

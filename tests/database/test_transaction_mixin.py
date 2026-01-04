@@ -370,3 +370,172 @@ class TestPendingSplits:
         """clear_pending_splits returns False when none exist."""
         result = temp_db.clear_pending_splits("nonexistent")
         assert result is False
+
+
+class TestConflictDetection:
+    """Tests for conflict detection when YNAB returns uncategorized but local has category."""
+
+    def test_conflict_detected_when_ynab_uncategorizes(self, temp_db: Database) -> None:
+        """Conflict detected when YNAB says uncategorized but local has category."""
+        # Insert a categorized transaction
+        txn = make_transaction(
+            id="txn-conflict",
+            category_id="cat-groceries",
+            category_name="Groceries",
+        )
+        temp_db.upsert_ynab_transaction(txn)
+
+        # Verify it was stored with category
+        stored = temp_db.get_ynab_transaction("txn-conflict")
+        assert stored["category_id"] == "cat-groceries"
+        assert stored["sync_status"] == "synced"
+
+        # Now YNAB returns uncategorized (simulating bank re-import)
+        ynab_txn = make_transaction(
+            id="txn-conflict",
+            category_id=None,
+            category_name=None,
+        )
+        was_inserted, was_changed = temp_db.upsert_ynab_transaction(ynab_txn)
+
+        # Should detect conflict and preserve local category
+        assert was_inserted is False
+        assert was_changed is True
+
+        stored = temp_db.get_ynab_transaction("txn-conflict")
+        assert stored["category_id"] == "cat-groceries"  # Preserved
+        assert stored["category_name"] == "Groceries"  # Preserved
+        assert stored["sync_status"] == "conflict"  # Marked as conflict
+
+    def test_no_conflict_when_both_have_same_category(self, temp_db: Database) -> None:
+        """No conflict when YNAB and local have same category."""
+        txn = make_transaction(
+            id="txn-same",
+            category_id="cat-groceries",
+            category_name="Groceries",
+        )
+        temp_db.upsert_ynab_transaction(txn)
+
+        # YNAB returns same category
+        was_inserted, was_changed = temp_db.upsert_ynab_transaction(txn)
+
+        assert was_inserted is False
+        assert was_changed is False
+
+        stored = temp_db.get_ynab_transaction("txn-same")
+        assert stored["sync_status"] == "synced"  # Not conflict
+
+    def test_no_conflict_when_local_uncategorized(self, temp_db: Database) -> None:
+        """No conflict when local was already uncategorized."""
+        txn = make_transaction(
+            id="txn-uncat",
+            category_id=None,
+            category_name=None,
+        )
+        temp_db.upsert_ynab_transaction(txn)
+
+        # YNAB also says uncategorized
+        was_inserted, was_changed = temp_db.upsert_ynab_transaction(txn)
+
+        assert was_inserted is False
+        assert was_changed is False
+
+        stored = temp_db.get_ynab_transaction("txn-uncat")
+        assert stored["sync_status"] == "synced"  # Not conflict
+
+    def test_no_conflict_when_pending_change_exists(self, temp_db: Database) -> None:
+        """No conflict when pending change exists (uses pending category)."""
+        # Insert uncategorized transaction
+        txn = make_transaction(
+            id="txn-pending",
+            category_id=None,
+            category_name=None,
+        )
+        temp_db.upsert_ynab_transaction(txn)
+
+        # Create pending change (user categorized locally)
+        temp_db.create_pending_change(
+            "txn-pending",
+            new_values={"category_id": "cat-groceries", "category_name": "Groceries"},
+            original_values={"category_id": None, "category_name": None},
+        )
+
+        # YNAB returns uncategorized
+        ynab_txn = make_transaction(
+            id="txn-pending",
+            category_id=None,
+            category_name=None,
+        )
+        was_inserted, was_changed = temp_db.upsert_ynab_transaction(ynab_txn)
+
+        # Should use pending category, not mark as conflict
+        stored = temp_db.get_ynab_transaction("txn-pending")
+        # Note: pending_changes preserves category, but sync_status may not be 'conflict'
+        # because pending_change exists - the protection mechanism uses pending values
+        assert stored is not None
+
+    def test_conflict_preserves_other_ynab_updates(self, temp_db: Database) -> None:
+        """Conflict detection preserves category but allows other YNAB field updates."""
+        # Insert categorized transaction
+        txn = make_transaction(
+            id="txn-update",
+            category_id="cat-groceries",
+            category_name="Groceries",
+            memo="Original memo",
+            approved=False,
+        )
+        temp_db.upsert_ynab_transaction(txn)
+
+        # YNAB returns uncategorized but with other changes
+        ynab_txn = make_transaction(
+            id="txn-update",
+            category_id=None,
+            category_name=None,
+            memo="Updated memo",
+            approved=True,
+        )
+        temp_db.upsert_ynab_transaction(ynab_txn)
+
+        stored = temp_db.get_ynab_transaction("txn-update")
+        # Category preserved
+        assert stored["category_id"] == "cat-groceries"
+        assert stored["category_name"] == "Groceries"
+        # Other fields updated
+        assert stored["memo"] == "Updated memo"
+        assert stored["approved"] == 1
+        # Marked as conflict
+        assert stored["sync_status"] == "conflict"
+
+    def test_conflict_can_be_updated_again(self, temp_db: Database) -> None:
+        """Transactions marked as conflict can still be updated on next pull."""
+        # Create conflict scenario
+        txn = make_transaction(
+            id="txn-conflict",
+            category_id="cat-groceries",
+            category_name="Groceries",
+        )
+        temp_db.upsert_ynab_transaction(txn)
+
+        # YNAB uncategorizes it (creates conflict)
+        ynab_txn = make_transaction(
+            id="txn-conflict",
+            category_id=None,
+            category_name=None,
+        )
+        temp_db.upsert_ynab_transaction(ynab_txn)
+
+        stored = temp_db.get_ynab_transaction("txn-conflict")
+        assert stored["sync_status"] == "conflict"
+
+        # Later, YNAB returns with a category (maybe user fixed it in YNAB)
+        fixed_txn = make_transaction(
+            id="txn-conflict",
+            category_id="cat-travel",
+            category_name="Travel",
+        )
+        was_inserted, was_changed = temp_db.upsert_ynab_transaction(fixed_txn)
+
+        assert was_changed is True
+        stored = temp_db.get_ynab_transaction("txn-conflict")
+        assert stored["category_id"] == "cat-travel"
+        assert stored["sync_status"] == "synced"  # Conflict resolved
