@@ -372,8 +372,8 @@ class CategorizerService:
             transaction, ["category_id", "category_name", "approved"]
         )
 
-        # Build display name showing split count
-        split_category_name = f"[Split {len(splits)}]"
+        # Use "Split" to match YNAB's category name for split transactions
+        split_category_name = "Split"
 
         # Create pending change record with split type
         self._db.create_pending_change(

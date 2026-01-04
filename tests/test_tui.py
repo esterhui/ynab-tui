@@ -743,7 +743,7 @@ class TestTUISplitTransaction:
 
                 # Verify the transaction was updated
                 txn = tui_app_with_multi_item_amazon._test_amazon_txn
-                assert txn.category_name == "[Split 2]"
+                assert txn.category_name == "Split"
                 assert txn.is_split is True
                 assert txn.approved is True
                 assert txn.sync_status == "pending_push"
@@ -752,7 +752,7 @@ class TestTUISplitTransaction:
                 pending = tui_database.get_pending_change(txn.id)
                 assert pending is not None
                 assert pending["change_type"] == "split"
-                assert pending["new_category_name"] == "[Split 2]"
+                assert pending["new_category_name"] == "Split"
                 assert pending["new_approved"] == 1  # SQLite stores booleans as 0/1
 
                 # Verify splits were stored
@@ -825,7 +825,7 @@ class TestTUISplitTransaction:
 
                 # Verify split was saved
                 txn = tui_app_with_multi_item_amazon._test_amazon_txn
-                assert txn.category_name == "[Split 2]"
+                assert txn.category_name == "Split"
 
                 # Now reopen the split screen by pressing 'x' again
                 await pilot.press("x")
@@ -2075,11 +2075,11 @@ class TestPushChangeItemFormatRow:
             "payee_name": "Costco",
             "amount": -200.0,
             "change_type": "split",
-            "new_values": {"category_id": None, "category_name": "[Split 2]"},
+            "new_values": {"category_id": None, "category_name": "Split"},
             "original_values": {"category_id": None, "category_name": None},
-            "new_category_name": "[Split 2]",
+            "new_category_name": "Split",
             "original_category_name": None,
-            "category_name": "[Split 2]",
+            "category_name": "Split",
         }
         item = PushChangeItem(change)
         row = item._format_row()

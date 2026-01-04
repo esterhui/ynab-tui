@@ -52,6 +52,28 @@ class MockYNABClient:
         if not csv_path.exists():
             return
 
+        # First pass: collect subtransactions by parent_id
+        subtxns_by_parent: dict[str, list[SubTransaction]] = {}
+        with open(csv_path, "r", newline="") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                parent_id = row.get("parent_transaction_id")
+                if parent_id:
+                    if parent_id not in subtxns_by_parent:
+                        subtxns_by_parent[parent_id] = []
+                    subtxns_by_parent[parent_id].append(
+                        SubTransaction(
+                            id=row["id"],
+                            transaction_id=parent_id,
+                            amount=float(row["amount"]),
+                            payee_name=row["payee_name"] if row["payee_name"] else None,
+                            memo=row["memo"] if row["memo"] else None,
+                            category_id=row["category_id"] if row["category_id"] else None,
+                            category_name=row["category_name"] if row["category_name"] else None,
+                        )
+                    )
+
+        # Second pass: load parent transactions with subtransactions attached
         with open(csv_path, "r", newline="") as f:
             reader = csv.DictReader(f)
             for row in reader:
@@ -64,9 +86,12 @@ class MockYNABClient:
                     break
 
                 txn_date = datetime.strptime(row["date"], "%Y-%m-%d")
+                txn_id = row["id"]
+                is_split = row.get("is_split", "0") in ("1", "true", "True")
+
                 self._transactions.append(
                     Transaction(
-                        id=row["id"],
+                        id=txn_id,
                         date=txn_date,
                         amount=float(row["amount"]),
                         payee_name=row["payee_name"],
@@ -79,7 +104,8 @@ class MockYNABClient:
                         transfer_account_id=row.get("transfer_account_id") or None,
                         transfer_account_name=row.get("transfer_account_name") or None,
                         debt_transaction_type=row.get("debt_transaction_type") or None,
-                        is_split=row.get("is_split", "0") in ("1", "true", "True"),
+                        is_split=is_split,
+                        subtransactions=subtxns_by_parent.get(txn_id, []) if is_split else [],
                     )
                 )
 

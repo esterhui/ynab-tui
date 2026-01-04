@@ -125,15 +125,15 @@ class TestDisplayPendingChanges:
         assert "Home & Garden" in captured.out
 
     def test_split_transaction_shows_split(self, capsys):
-        """Test that split transaction shows '[Split 2]' as new category."""
+        """Test that split transaction shows 'Split' as new category."""
         changes = [
             {
                 "date": "2024-06-15",
                 "payee_name": "Test Payee",
                 "amount": -100.00,
                 "original_category_name": "Groceries",
-                "new_category_name": "[Split 2]",
-                "new_values": {"category_id": None, "category_name": "[Split 2]"},
+                "new_category_name": "Split",
+                "new_values": {"category_id": None, "category_name": "Split"},
                 "original_values": {"category_id": "cat-1", "category_name": "Groceries"},
             },
         ]

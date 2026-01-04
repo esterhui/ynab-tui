@@ -561,7 +561,7 @@ class TestPushYnab:
         # Create pending split
         temp_db.create_pending_change(
             "txn-001",
-            {"category_name": "[Split 2]", "approved": True},
+            {"category_name": "Split", "approved": True},
             {"category_id": None},
             "split",
         )

@@ -402,7 +402,7 @@ class TestApplySplitCategories:
 
         assert result.is_split is True
         assert result.sync_status == "pending_push"
-        assert "[Split 2]" in result.category_name
+        assert result.category_name == "Split"
 
         # Verify splits are stored
         pending_splits = temp_db.get_pending_splits("txn-001")

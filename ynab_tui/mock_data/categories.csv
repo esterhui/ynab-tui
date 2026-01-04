@@ -1,39 +1,39 @@
 group_id,group_name,category_id,budget_id,category_name,hidden,deleted
-a2a32680-e166-4472-8e37-801dba96bc66,Housing,8ffc064e-8d6c-4579-8bf5-0002f5125663,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Rent/Mortgage,false,false
-a2a32680-e166-4472-8e37-801dba96bc66,Housing,555b5fd0-775f-46b3-af19-1a2cad5f9a77,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Electricity,false,false
-a2a32680-e166-4472-8e37-801dba96bc66,Housing,4e5066bf-019b-42fa-8b57-59433453583d,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Water/Sewer,false,false
-a2a32680-e166-4472-8e37-801dba96bc66,Housing,ef269f33-208b-44e0-b4df-5c516ddc24f1,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Natural Gas,false,false
-a2a32680-e166-4472-8e37-801dba96bc66,Housing,c5e05ab0-617d-4033-965c-1f4e832d857e,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Internet,false,false
-a2a32680-e166-4472-8e37-801dba96bc66,Housing,b9bc2c2f-d597-4348-ac59-68fc9f6166e4,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Home Maintenance,false,false
-a2a32680-e166-4472-8e37-801dba96bc66,Housing,dbd03923-013b-4278-9c3b-10161774b800,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Home Insurance,false,false
-8a47bd25-500a-4a2d-bc5d-cc1aa439966b,Transportation,bbfd0cdb-a8a4-4707-a821-2929ccf63483,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Gas,false,false
-8a47bd25-500a-4a2d-bc5d-cc1aa439966b,Transportation,98847949-98a7-4c3f-98f9-b74443a5e4f3,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Car Insurance,false,false
-8a47bd25-500a-4a2d-bc5d-cc1aa439966b,Transportation,7f9ca0bd-1874-49d9-a7c3-43ad6c4c8bf6,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Car Maintenance,false,false
-8a47bd25-500a-4a2d-bc5d-cc1aa439966b,Transportation,d0f9bb9b-c4e9-4e35-aefe-89acb16d3ec6,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Parking,false,false
-8a47bd25-500a-4a2d-bc5d-cc1aa439966b,Transportation,71ba52ce-28c9-4e33-a505-2bb467b335df,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Public Transit,false,false
-3cd82f05-758f-43c6-8652-cc489a8c0eaf,Food,bc4f3ff3-5ecf-4165-b2aa-de40d40d4ddd,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Groceries,false,false
-3cd82f05-758f-43c6-8652-cc489a8c0eaf,Food,4c34f7f0-c237-442d-b0a2-0c692d17caa8,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Dining Out,false,false
-3cd82f05-758f-43c6-8652-cc489a8c0eaf,Food,f1f47ec0-b4c2-42db-8ffb-61cb3c6f34c3,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Coffee Shops,false,false
-69ff760b-84f4-4462-b635-0add5333937b,Bills & Utilities,d2de47b4-a07a-4ebd-b739-c004fa4f880a,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Phone,false,false
-69ff760b-84f4-4462-b635-0add5333937b,Bills & Utilities,b209d80e-1b09-4268-9247-0eea842b65b5,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Subscriptions,false,false
-69ff760b-84f4-4462-b635-0add5333937b,Bills & Utilities,c168ab29-fbb3-45ba-9639-ad40d4daf9ee,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Software,false,false
-0d184fb8-f84f-43ec-a72f-3e7ec0257e7a,Personal,54a6b069-6b4b-4329-adf9-8a103d668df9,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Clothing,false,false
-0d184fb8-f84f-43ec-a72f-3e7ec0257e7a,Personal,4e3281c7-4d63-4373-8823-19a57572744a,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Healthcare,false,false
-0d184fb8-f84f-43ec-a72f-3e7ec0257e7a,Personal,c380b839-2765-4a7b-b937-0373b5e9600f,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Personal Care,false,false
-0d184fb8-f84f-43ec-a72f-3e7ec0257e7a,Personal,81df3fb9-d916-4206-a36a-c82b84d059b2,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Fitness,false,false
-0d184fb8-f84f-43ec-a72f-3e7ec0257e7a,Personal,a5e3001a-74d4-4642-b0b8-39c885970433,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Education,false,false
-af29da38-2d56-4551-8e99-24cb48d0bad0,Entertainment,24bc9126-01a0-467b-a458-81e691e960a2,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Entertainment,false,false
-af29da38-2d56-4551-8e99-24cb48d0bad0,Entertainment,5128c795-d89b-4f8e-9c60-b30b08c2bfae,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Hobbies,false,false
-af29da38-2d56-4551-8e99-24cb48d0bad0,Entertainment,c2d331db-827e-497e-bd95-335800bf8654,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Travel,false,false
-af29da38-2d56-4551-8e99-24cb48d0bad0,Entertainment,2c80ebd0-79af-4a73-ad15-796ae3fa9815,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Gifts,false,false
-2155e642-bf49-46ae-a6fb-da89997d17b4,Shopping,fc31620b-b4cd-445a-b736-75bbab9acf1b,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,General Shopping,false,false
-2155e642-bf49-46ae-a6fb-da89997d17b4,Shopping,b7b29120-732e-4aa8-94e9-e5057e689308,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Electronics,false,false
-2155e642-bf49-46ae-a6fb-da89997d17b4,Shopping,59224d0e-ae81-4900-a7a1-2f96965384b2,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Home Goods,false,false
-2155e642-bf49-46ae-a6fb-da89997d17b4,Shopping,c3b6f7d3-3aad-414e-bf4f-06de3ddf25e3,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Baby & Kids,false,false
-ad24f710-2ff7-440e-8f84-196b4f91449d,Financial,85c7866f-62ec-4619-becf-b6beda3188f9,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Savings Transfer,false,false
-ad24f710-2ff7-440e-8f84-196b4f91449d,Financial,6a956b9b-af18-41da-b35a-50cb8842e81f,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Investment,false,false
-ad24f710-2ff7-440e-8f84-196b4f91449d,Financial,81aa8a6f-c73f-46e1-80bf-3f28269a8901,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Emergency Fund,false,false
-ad24f710-2ff7-440e-8f84-196b4f91449d,Financial,61649e60-3bfb-434a-9105-49824e9f9c52,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Credit Card Payment,false,false
-506dab4b-597e-4565-8274-276ee4fb1f69,Income,b3b04bfd-a732-48aa-ae02-7dc9329fdd7c,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Inflow: Ready to Assign,false,false
-506dab4b-597e-4565-8274-276ee4fb1f69,Income,f61008bd-5f5a-4be3-b81a-7461b6aa5c78,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Reimbursement,false,false
-e5812b72-5200-4430-9b2f-ad314411bf22,Internal Master Category,661b8070-9d92-4d79-b459-e52b9846e3bc,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Uncategorized,false,false
+697c43b8-fce4-402a-8df5-5c24be2a04e5,Housing,a7a4d58e-9ed0-4108-8452-59bcbc299b04,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Rent/Mortgage,false,false
+697c43b8-fce4-402a-8df5-5c24be2a04e5,Housing,ab4afb28-1363-4087-9fff-a797732a3dc1,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Electricity,false,false
+697c43b8-fce4-402a-8df5-5c24be2a04e5,Housing,d120cbda-f657-40f6-8673-ba4d4849f0cf,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Water/Sewer,false,false
+697c43b8-fce4-402a-8df5-5c24be2a04e5,Housing,4bbb45df-4e57-4950-993e-220efb877611,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Natural Gas,false,false
+697c43b8-fce4-402a-8df5-5c24be2a04e5,Housing,837bb46a-1259-4e8b-8c72-cd3138bf6398,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Internet,false,false
+697c43b8-fce4-402a-8df5-5c24be2a04e5,Housing,696fba9d-5f45-4a1b-9110-21c1a46f7895,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Home Maintenance,false,false
+697c43b8-fce4-402a-8df5-5c24be2a04e5,Housing,a8e44fdf-ad78-4189-9591-b919c3cee77b,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Home Insurance,false,false
+a9c5b857-f49f-4ac3-a2c2-61dbd4621e2e,Transportation,93cb38b2-3ecf-4571-947e-8ba3c91450ad,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Gas,false,false
+a9c5b857-f49f-4ac3-a2c2-61dbd4621e2e,Transportation,e1779c05-8467-4448-8001-5aeb6e1b7eeb,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Car Insurance,false,false
+a9c5b857-f49f-4ac3-a2c2-61dbd4621e2e,Transportation,0f53b110-cdb5-40b0-977e-dba5736fd8a1,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Car Maintenance,false,false
+a9c5b857-f49f-4ac3-a2c2-61dbd4621e2e,Transportation,eaffb791-1440-409d-b655-5c1ed134178f,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Parking,false,false
+a9c5b857-f49f-4ac3-a2c2-61dbd4621e2e,Transportation,e62ce42e-5197-4f75-a96c-2fb24d312173,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Public Transit,false,false
+44beb7f6-8cd1-4ee5-9c95-98eee7c1449d,Food,bef62729-cb09-4dbb-a29c-c2cfc174afd0,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Groceries,false,false
+44beb7f6-8cd1-4ee5-9c95-98eee7c1449d,Food,bb02f309-3ad8-4491-b595-d66e70befefa,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Dining Out,false,false
+44beb7f6-8cd1-4ee5-9c95-98eee7c1449d,Food,9302e82a-7f85-4edd-a718-2b34efc9fc44,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Coffee Shops,false,false
+3bf3a11f-14ee-416c-9d12-da9c9706483d,Bills & Utilities,46ef0088-36ca-4b91-8466-8b2beddcd2db,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Phone,false,false
+3bf3a11f-14ee-416c-9d12-da9c9706483d,Bills & Utilities,728a00d9-4157-4e79-b69e-91870f29f918,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Subscriptions,false,false
+3bf3a11f-14ee-416c-9d12-da9c9706483d,Bills & Utilities,9481382a-e124-4199-8db7-79daff667adf,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Software,false,false
+179228a7-e7b0-417d-a39f-e9a49c2676e3,Personal,dbe377a1-d24b-41ef-8366-b8eadead9392,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Clothing,false,false
+179228a7-e7b0-417d-a39f-e9a49c2676e3,Personal,aae67153-e966-46dc-84aa-63e35338ad05,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Healthcare,false,false
+179228a7-e7b0-417d-a39f-e9a49c2676e3,Personal,cfff9012-ec85-4ed0-ac76-1fcaf79165e0,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Personal Care,false,false
+179228a7-e7b0-417d-a39f-e9a49c2676e3,Personal,eae6431f-fc21-4ead-afd7-f70b5f0c0ea9,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Fitness,false,false
+179228a7-e7b0-417d-a39f-e9a49c2676e3,Personal,eadb2a1d-fadf-43bc-a6bc-a85c79e36c5d,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Education,false,false
+b4f9cc13-3c8f-4cb8-89c0-557f6e3ea887,Entertainment,68256aec-3b02-48b3-ae46-b5d795a18e5b,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Entertainment,false,false
+b4f9cc13-3c8f-4cb8-89c0-557f6e3ea887,Entertainment,b6739c05-9e9c-440c-bd1c-1d33f575f796,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Hobbies,false,false
+b4f9cc13-3c8f-4cb8-89c0-557f6e3ea887,Entertainment,4884c81d-7b4d-4c31-aaa3-3479233a7b0f,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Travel,false,false
+b4f9cc13-3c8f-4cb8-89c0-557f6e3ea887,Entertainment,118ba131-0b42-4069-b5fb-7c93d713b0bf,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Gifts,false,false
+88927f6d-e075-4e7e-9b95-8f40ce3d92ad,Shopping,61286506-209d-4f4e-b262-9c9909a0c432,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,General Shopping,false,false
+88927f6d-e075-4e7e-9b95-8f40ce3d92ad,Shopping,c7312ba3-7b58-42ed-80af-acbefc59894a,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Electronics,false,false
+88927f6d-e075-4e7e-9b95-8f40ce3d92ad,Shopping,dedb5e57-6b5b-47fd-8227-b6d5c03fd629,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Home Goods,false,false
+88927f6d-e075-4e7e-9b95-8f40ce3d92ad,Shopping,460f67ed-9700-4d01-b364-186e52f93e0d,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Baby & Kids,false,false
+964c93fb-0b3d-4fba-85c4-30a6fe6dc8ec,Financial,94345d74-5f14-4337-a85d-5c4be3728d85,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Savings Transfer,false,false
+964c93fb-0b3d-4fba-85c4-30a6fe6dc8ec,Financial,becb0a55-4fcc-4a1b-a1f2-a8d0ca58c90b,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Investment,false,false
+964c93fb-0b3d-4fba-85c4-30a6fe6dc8ec,Financial,f6d159e4-5c40-45c8-9d4f-edca098c502d,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Emergency Fund,false,false
+964c93fb-0b3d-4fba-85c4-30a6fe6dc8ec,Financial,d21f13dc-f034-4ba8-a6f1-b3bd1bf1d4ed,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Credit Card Payment,false,false
+192cefc4-1229-4e3b-9dea-f8a4082d64b8,Income,1027106e-ba0e-405c-996c-b92fa8b4c0ea,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Inflow: Ready to Assign,false,false
+192cefc4-1229-4e3b-9dea-f8a4082d64b8,Income,6f951679-91c5-47f9-815b-1214351522bb,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Reimbursement,false,false
+f54a4333-5ca1-4c98-870a-fd69c1ff3536,Internal Master Category,92573da9-ca68-4ff9-9cff-72e58384df36,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee,Uncategorized,false,false

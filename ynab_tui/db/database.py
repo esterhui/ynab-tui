@@ -575,8 +575,8 @@ class Database:
         self, transaction_id: str, splits: list[dict[str, Any]], category_name: str | None = None
     ) -> bool:
         """Mark a transaction as pending push with split information."""
-        # Use provided category_name or generate format [Split N]
-        split_category = category_name or f"[Split {len(splits)}]"
+        # Use "Split" to match YNAB's category name for split transactions
+        split_category = category_name or "Split"
         with self._connection() as conn:
             cursor = conn.execute(
                 "UPDATE ynab_transactions SET category_name=?, is_split=1, sync_status='pending_push', modified_at=? WHERE id=?",
