@@ -86,19 +86,20 @@ ynab-tui --version
 ```
 
 **Vim-style keybindings:**
-- `j/k` or arrows - Navigate up/down
+- `j/k` - Navigate up/down
 - `g/G` - Go to top/bottom
-- `Ctrl+d/u` - Page down/up
-- `c` - Categorize selected transaction
-- `a` - Approve transaction
-- `x` - Split transaction (for Amazon orders)
-- `u` - Undo last change
-- `p` - Preview pending changes
+- `Ctrl+d/u` - Half page down/up
+- `c` - Categorize (bulk if tagged)
+- `a` - Approve (bulk if tagged)
+- `u` - Undo pending change
+- `x` - Split (Amazon multi-item)
+- `p` - Push pending changes
 - `/` - Search transactions
-- `f` - Cycle filter (all/approved/uncategorized/pending)
-- `t` - Tag transaction for bulk operations
+- `f` - Filter menu (then: `a`pproved `n`ew `u`ncat p`e`nding `c`ategory `p`ayee `r`eset)
+- `t` - Tag/untag for bulk operations
 - `T` - Clear all tags
 - `b` - Switch budget
+- `m` - Edit memo
 - `s` - Settings
 - `?` - Help
 - `q` - Quit
@@ -207,7 +208,7 @@ ynab-tui
 # 3. In the TUI: navigate with j/k, categorize with 'c', approve with 'a'
 #    For Amazon orders, use 'x' to split into individual items
 
-# 4. Push your changes back to YNAB (from CLI or use 'P' in TUI)
+# 4. Push your changes back to YNAB (from CLI or use 'p' in TUI)
 ynab-tui push
 
 # Optional: preview changes before pushing

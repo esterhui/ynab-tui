@@ -42,13 +42,6 @@ from .state import (
 )
 
 
-def _format_sync_time(timestamp: Optional[datetime]) -> str:
-    """Format sync timestamp as absolute time."""
-    if timestamp is None:
-        return "Never"
-    return timestamp.strftime("%Y-%m-%d %H:%M")
-
-
 class TransactionListItem(ListItem):
     """A list item displaying a transaction row."""
 
@@ -279,17 +272,17 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         # Essential actions (shown in footer - 8 total)
         Binding("c", "categorize", "Category"),
         Binding("a", "approve", "Approve"),
-        Binding("m", "edit_memo", "Memo"),
+        Binding("u", "undo", "Undo"),
         Binding("f", "cycle_filter", "Filter"),
         Binding("/", "fuzzy_search", "Search"),
         Binding("p", "push_preview", "Push"),
         Binding("x", "split", "Split"),
         Binding("?", "show_help", "Help"),
         # Hidden actions (still work, not shown in footer)
+        Binding("m", "edit_memo", "Memo", show=False),
         Binding("s", "settings", "Settings", show=False),
-        Binding("u", "undo", "Undo", show=False),
         Binding("q", "quit", "Quit", show=False),
-        Binding("escape", "escape_back", "Back", show=False),
+        Binding("escape", "quit", "Quit", show=False),
         Binding("b", "switch_budget", "Budget", show=False),
         Binding("t", "toggle_tag", "Tag", show=False),
         Binding("T", "clear_all_tags", "Untag All", show=False),
@@ -310,8 +303,8 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         "a": "approved",
         "n": "new",
         "u": "uncategorized",
-        "e": "pending",  # Changed from 'p' to free up for payee
-        "x": "all",
+        "e": "pending",
+        "r": "all",  # Reset to all
         "c": "category",  # Opens category filter modal
         "p": "payee",  # Opens payee filter modal
     }
@@ -370,33 +363,28 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             pass  # Header might not be mounted yet
 
     def _build_status_bar_text(self) -> str:
-        """Build the status bar text with filter stats, sync times, and optional mock indicator."""
+        """Build the status bar text with filter and counts."""
         parts = []
 
-        # Only show MOCK indicator when in mock mode (cleaner look for normal use)
+        # Mock indicator
         if self._is_mock:
             parts.append("[yellow]MOCK[/yellow]")
 
-        # Filter stats (moved from header-stats)
-        filter_label = self._get_filter_display_label()
-        parts.append(f"Filter: [b]{filter_label}[/b]")
+        # Filter label (no "Filter:" prefix)
+        parts.append(f"[b]{self._get_filter_display_label()}[/b]")
 
-        # Transaction counts
+        # Compact transaction counts
         if hasattr(self, "_transactions") and self._transactions:
             total = self._transactions.total_count
             uncategorized = sum(1 for t in self._transactions.transactions if t.is_uncategorized)
             unapproved = sum(1 for t in self._transactions.transactions if t.is_unapproved)
-            parts.append(f"[b]{total}[/b] txns")
-            if uncategorized:
-                parts.append(f"[b]{uncategorized}[/b] uncat")
-            if unapproved:
-                parts.append(f"[b]{unapproved}[/b] unappr")
 
-        # Sync time (YNAB only)
-        sync_status = self._categorizer.get_sync_status()
-        ynab_sync = sync_status["ynab"]
-        ynab_time = _format_sync_time(ynab_sync.get("last_sync_at") if ynab_sync else None)
-        parts.append(f"YNAB: {ynab_time}")
+            counts = [str(total)]
+            if uncategorized:
+                counts.append(f"{uncategorized} uncat")
+            if unapproved:
+                counts.append(f"{unapproved} new")
+            parts.append(" / ".join(counts))
 
         return " │ ".join(parts)
 
@@ -520,36 +508,6 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         """Handle quit action."""
         self.exit()
 
-    def action_escape_back(self) -> None:
-        """Handle Escape key - progressively dismiss UI elements."""
-        # 1. Cancel filter submenu if active
-        if self._filter_state.is_submenu_active:
-            self._cancel_filter_pending()
-            return
-
-        # 2. Clear filters if any are applied
-        if self._has_active_filters():
-            self._clear_all_filters()
-            return
-
-        # 3. Otherwise quit
-        self.exit()
-
-    def _has_active_filters(self) -> bool:
-        """Check if any filters are currently applied."""
-        return (
-            self._filter_state.mode != "all"
-            or self._filter_state.category is not None
-            or self._filter_state.payee is not None
-        )
-
-    def _clear_all_filters(self) -> None:
-        """Clear all active filters and refresh."""
-        self._filter_state = FilterStateMachine.reset(self._filter_state)
-        self._restore_status_bar()
-        self.notify("Filters cleared", timeout=1)
-        self.run_worker(self._load_transactions(), exclusive=True)
-
     def action_refresh(self) -> None:
         """Refresh transactions."""
         self.run_worker(self._load_transactions(), exclusive=True)
@@ -619,14 +577,14 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         # Enter filter submenu mode
         self._filter_state = FilterStateMachine.enter_submenu(self._filter_state)
         filter_text = (
-            "[bold yellow]Filter (press key within 3s):[/bold yellow] "
-            "[bold cyan]a[/bold cyan]=Approved  "
-            "[bold cyan]n[/bold cyan]=New  "
-            "[bold cyan]u[/bold cyan]=Uncategorized  "
-            "[bold cyan]e[/bold cyan]=Pending  "
-            "[bold cyan]c[/bold cyan]=Category  "
-            "[bold cyan]p[/bold cyan]=Payee  "
-            "[bold cyan]x[/bold cyan]=All"
+            "[yellow]Filter:[/yellow] "
+            "[cyan]a[/cyan]pproved "
+            "[cyan]n[/cyan]ew "
+            "[cyan]u[/cyan]ncat "
+            "p[cyan]e[/cyan]nding "
+            "[cyan]c[/cyan]ategory "
+            "[cyan]p[/cyan]ayee "
+            "[cyan]r[/cyan]eset"
         )
         self._update_status_bar(filter_text)
 

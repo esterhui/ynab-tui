@@ -33,7 +33,7 @@ class TransactionSummary:
 class CategoryPickerModal(FuzzySelectModal[CategorySelection]):
     """fzf-style fuzzy category picker modal.
 
-    Opens as an overlay, type to filter, arrow keys to navigate, Enter to select.
+    Opens as an overlay, type to filter, j/k to navigate, Enter to select.
     Returns CategorySelection on success, None on cancel.
     """
 
@@ -185,6 +185,6 @@ class CategoryPickerModal(FuzzySelectModal[CategorySelection]):
             yield Input(placeholder=self._placeholder, id="fuzzy-input")
             yield ListView(id="fuzzy-list")
             yield Static(
-                "↑↓ navigate • PgUp/PgDn scroll • Enter select • Esc cancel",
+                "j/k navigate • Enter select • Esc cancel",
                 id="fuzzy-footer",
             )

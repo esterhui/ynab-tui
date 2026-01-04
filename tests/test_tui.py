@@ -82,7 +82,7 @@ class TestTUIFilterNavigation:
                 ("n", "new"),
                 ("u", "uncategorized"),
                 ("e", "pending"),  # Changed from 'p' to 'e' for pending
-                ("x", "all"),
+                ("r", "all"),
             ]
 
             for key, expected_mode in filter_tests:
@@ -316,7 +316,7 @@ class TestTUIPushPreview:
             assert db.get_pending_change_count() == 1
 
     async def test_push_preview_confirm_and_push(self, tui_app_with_pending):
-        """Test 'y' pushes changes and closes screen."""
+        """Test 'enter' pushes changes and closes screen."""
         async with tui_app_with_pending.run_test() as pilot:
             await pilot.pause()
 
@@ -328,8 +328,8 @@ class TestTUIPushPreview:
             await pilot.press("p")
             await pilot.pause()
 
-            # Press 'y' to push directly
-            await pilot.press("y")
+            # Press enter to push
+            await pilot.press("enter")
             await pilot.pause()
 
             # Wait for all workers to complete (push worker + reload worker)
@@ -344,8 +344,8 @@ class TestTUIPushPreview:
             # Pending change should be cleared after successful push
             assert db.get_pending_change_count() == 0
 
-    async def test_push_preview_cancel_with_n(self, tui_app_with_pending):
-        """Test 'n' cancels push preview and closes screen."""
+    async def test_push_preview_cancel_with_escape(self, tui_app_with_pending):
+        """Test 'escape' cancels push preview and closes screen."""
         async with tui_app_with_pending.run_test() as pilot:
             await pilot.pause()
 
@@ -355,8 +355,8 @@ class TestTUIPushPreview:
             await pilot.press("p")
             await pilot.pause()
 
-            # Press 'n' to cancel (same as 'q')
-            await pilot.press("n")
+            # Press escape to cancel
+            await pilot.press("escape")
             await pilot.pause()
 
             # Should return to main screen
@@ -2039,21 +2039,6 @@ class TestVersionAndFormatting:
         assert len(__version__) > 0
         # Should be semantic version format
         assert "." in __version__
-
-    def test_format_sync_time_none(self):
-        """Test _format_sync_time handles None."""
-        from ynab_tui.tui.app import _format_sync_time
-
-        result = _format_sync_time(None)
-        assert result == "Never"
-
-    def test_format_sync_time_with_datetime(self):
-        """Test _format_sync_time formats datetime."""
-        from ynab_tui.tui.app import _format_sync_time
-
-        result = _format_sync_time(datetime(2025, 1, 15, 10, 30))
-        assert "2025-01-15" in result
-        assert "10:30" in result
 
 
 # =============================================================================

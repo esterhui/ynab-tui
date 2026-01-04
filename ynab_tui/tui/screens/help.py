@@ -7,48 +7,42 @@ from textual.screen import Screen
 from textual.widgets import Footer, Header, Static
 
 HELP_TEXT = """\
-[b]Vim-style Navigation:[/b]
-  j/Down    Move down
-  k/Up      Move up
-  g         Go to top
-  G         Go to bottom
-  Ctrl+d    Half page down
-  Ctrl+u    Half page up
-  Ctrl+f    Full page down
-  Ctrl+b    Full page up
+[b]Navigation:[/b]
+  j/k       Move down/up
+  g/G       Top/bottom
+  Ctrl+d/u  Half page down/up
+  Ctrl+f/b  Full page down/up
 
-[b]Tagging & Bulk Actions:[/b]
-  t         Tag/untag transaction (green star)
-  c/Enter   Categorize (bulk if tagged)
+[b]Actions:[/b]
+  c         Categorize (bulk if tagged)
   a         Approve (bulk if tagged)
-
-[b]Categorization:[/b]
-  x         Split mode (Amazon multi-item)
+  u         Undo pending change
+  x         Split (Amazon multi-item)
   m         Edit memo
-  u         Undo pending change (revert to original)
+  p         Push to YNAB
 
-[b]Other Actions:[/b]
-  f         Filter menu (then press a/n/u/p/x)
-  T         Untag all tagged transactions
+[b]Tagging:[/b]
+  t         Tag/untag (★)
+  T         Clear all tags
+
+[b]Filter (f + key):[/b]
+  a         Approved
+  n         New (unapproved)
+  u         Uncategorized
+  e         Pending push
+  c         By category
+  p         By payee
+  r         Reset (all)
+
+[b]Other:[/b]
+  /         Search
+  b         Switch budget
   s         Settings
-  p         Push pending changes to YNAB
-  F5        Refresh
   q         Quit
 
-[b]Filter Shortcuts (after pressing f):[/b]
-  fa        Approved transactions
-  fn        New (unapproved) transactions
-  fu        Uncategorized transactions
-  fp        Pending push to YNAB
-  fx        All transactions
-
-[b]Status Column Legend:[/b]
-  A         Approved
-  C         Cleared
-  R         Reconciled
-  M         Has memo
-  P         Pending push to YNAB
-  !         Sync conflict
+[b]Status Flags:[/b]
+  A=Approved  C=Cleared  R=Reconciled
+  M=Memo  P=Pending  !=Conflict
 """
 
 

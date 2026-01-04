@@ -171,11 +171,9 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
     """
 
     BINDINGS = [
-        Binding("enter", "do_push", "Push"),
-        Binding("y", "do_push", "Push", show=False),
-        Binding("q", "cancel", "Cancel", show=False),
-        Binding("n", "cancel", "Cancel", show=False),
+        Binding("enter", "do_push", "Push", priority=True),
         Binding("escape", "cancel", "Cancel"),
+        Binding("q", "cancel", "Cancel", show=False),
         # Vim-style navigation
         *VIM_NAVIGATION_BINDINGS,
     ]
@@ -202,8 +200,7 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
         yield Header()
         yield Container(
             Static(
-                f"[b]Review {len(self._changes)} Pending Changes[/b]\n"
-                "[dim]Press Enter to push, q/Esc to cancel[/dim]",
+                f"[b]{len(self._changes)} Pending Changes[/b]  [dim]Enter=push  Esc=cancel[/dim]",
                 id="header-label",
             ),
             ListView(
