@@ -612,7 +612,29 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         return FilterStateMachine.get_display_label(self._filter_state)
 
     def on_key(self, event) -> None:
-        """Handle key events for filter sub-keys."""
+        """Handle key events for filter sub-keys and page navigation."""
+        # Intercept page/home/end keys to move highlight (not just scroll)
+        if event.key == "pagedown":
+            self.action_page_down()
+            event.stop()
+            event.prevent_default()
+            return
+        elif event.key == "pageup":
+            self.action_page_up()
+            event.stop()
+            event.prevent_default()
+            return
+        elif event.key == "home":
+            self.action_scroll_home()
+            event.stop()
+            event.prevent_default()
+            return
+        elif event.key == "end":
+            self.action_scroll_end()
+            event.stop()
+            event.prevent_default()
+            return
+
         # Handle filter sub-keys
         if self._filter_state.is_submenu_active and event.key in self.FILTER_KEYS:
             event.stop()  # Stop event propagation

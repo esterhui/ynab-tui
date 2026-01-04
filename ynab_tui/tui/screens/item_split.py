@@ -5,7 +5,7 @@ from typing import Optional
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
-from textual.screen import Screen
+from textual.screen import ModalScreen
 from textual.widgets import Footer, Header, ListItem, ListView, Static
 
 from ...models import Transaction
@@ -64,8 +64,8 @@ class SplitItemListItem(ListItem):
         self.query_one(Static).update(self._format_row())
 
 
-class ItemSplitScreen(Screen[bool]):
-    """Screen for splitting Amazon transactions by item.
+class ItemSplitScreen(ModalScreen[bool]):
+    """Modal screen for splitting Amazon transactions by item.
 
     Shows a ListView of order items, navigate with j/k, press 'c' to
     categorize each using CategoryPickerModal.
