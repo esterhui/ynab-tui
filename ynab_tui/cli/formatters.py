@@ -377,13 +377,31 @@ def display_dry_run_transactions(result: PullResult) -> None:
             click.echo(f"  {date_str:<12} {payee:<30} ${txn.amount:>10,.2f}")
 
     if result.details_to_update:
-        click.echo(click.style("\n  Would UPDATE:", fg="yellow"))
-        click.echo(f"  {'Date':<12} {'Payee':<30} {'Amount':>12}")
-        click.echo("  " + "-" * 55)
-        for txn in result.details_to_update:
-            date_str = txn.date.strftime("%Y-%m-%d")
-            payee = (txn.payee_name or "")[:30]
-            click.echo(f"  {date_str:<12} {payee:<30} ${txn.amount:>10,.2f}")
+        # Check if any are conflicts
+        conflicts = [t for t in result.details_to_update if t.is_conflict]
+        non_conflicts = [t for t in result.details_to_update if not t.is_conflict]
+
+        if non_conflicts:
+            click.echo(click.style("\n  Would UPDATE:", fg="yellow"))
+            click.echo(f"  {'Date':<12} {'Payee':<30} {'Amount':>12}")
+            click.echo("  " + "-" * 55)
+            for txn in non_conflicts:
+                date_str = txn.date.strftime("%Y-%m-%d")
+                payee = (txn.payee_name or "")[:30]
+                click.echo(f"  {date_str:<12} {payee:<30} ${txn.amount:>10,.2f}")
+
+        if conflicts:
+            click.echo(click.style("\n  ! CONFLICTS (local category preserved):", fg="red"))
+            click.echo(f"  {'Date':<12} {'Payee':<25} {'Amount':>10}  {'Category'}")
+            click.echo("  " + "-" * 65)
+            for txn in conflicts:
+                date_str = txn.date.strftime("%Y-%m-%d")
+                payee = (txn.payee_name or "")[:25]
+                cat_info = f"{txn.local_category}→Uncat" if txn.local_category else ""
+                click.echo(
+                    click.style("! ", fg="red")
+                    + f"{date_str:<12} {payee:<25} ${txn.amount:>9,.2f}  {cat_info}"
+                )
 
 
 def display_dry_run_amazon(result: PullResult) -> None:

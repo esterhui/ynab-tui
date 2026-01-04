@@ -38,6 +38,8 @@ class TransactionDetail:
     date: datetime
     payee_name: str
     amount: float  # In dollars, not milliunits
+    is_conflict: bool = False  # True if YNAB uncategorized but local has category
+    local_category: str = ""  # Local category name (for conflict display)
 
 
 @dataclass
@@ -195,11 +197,20 @@ class SyncService:
                     # Dry run - compare fetched with database to get accurate counts
                     for txn in transactions:
                         existing = self._db.get_ynab_transaction(txn.id)
-                        # Amount is in milliunits, convert to dollars for display
+                        # Detect conflict: local has category but YNAB says uncategorized
+                        is_conflict = bool(
+                            existing and existing["category_id"] and not txn.category_id
+                        )
+                        local_category = (
+                            existing["category_name"] if existing and is_conflict else ""
+                        )
+                        # txn.amount is already in dollars (converted in _convert_transaction)
                         detail = TransactionDetail(
                             date=txn.date,
                             payee_name=txn.payee_name or "",
-                            amount=txn.amount / 1000.0,
+                            amount=txn.amount,
+                            is_conflict=is_conflict,
+                            local_category=local_category or "",
                         )
                         if existing:
                             # Check if data would change (simplified comparison)
