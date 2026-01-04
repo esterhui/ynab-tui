@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Callable, Optional, Union
 
 from tqdm import tqdm
 
@@ -19,7 +19,7 @@ from ynab_tui.config import AmazonConfig, CategorizationConfig
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from ..clients import AmazonClientProtocol, YNABClientProtocol
+    from ..clients import AmazonClient, MockAmazonClient, MockYNABClient, YNABClient
     from ..db.database import Database
 
 
@@ -71,8 +71,8 @@ class SyncService:
     def __init__(
         self,
         db: Database,
-        ynab: YNABClientProtocol,
-        amazon: Optional[AmazonClientProtocol] = None,
+        ynab: Union["YNABClient", "MockYNABClient"],
+        amazon: Optional[Union["AmazonClient", "MockAmazonClient"]] = None,
         categorization_config: Optional[CategorizationConfig] = None,
         amazon_config: Optional[AmazonConfig] = None,
     ):

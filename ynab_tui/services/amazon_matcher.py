@@ -5,7 +5,7 @@ The actual matching algorithms are in matching/algorithms.py as pure functions.
 """
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional, Union
+from typing import Optional
 
 from ..config import AmazonConfig
 from ..db.database import AmazonOrderCache, Database
@@ -18,9 +18,6 @@ from .matching import (
     find_unmatched_orders,
     match_transactions_two_stage,
 )
-
-if TYPE_CHECKING:
-    from ..db.protocols import AmazonOrderRepositoryProtocol
 
 # Re-export for backwards compatibility
 __all__ = ["AmazonMatchResult", "AmazonOrderMatcher", "TransactionInfo"]
@@ -40,7 +37,7 @@ class AmazonOrderMatcher:
 
     def __init__(
         self,
-        order_repo: Union[Database, "AmazonOrderRepositoryProtocol"],
+        order_repo: Database,
         amazon_config: Optional[AmazonConfig] = None,
         stage1_window: Optional[int] = None,
         stage2_window: Optional[int] = None,
@@ -49,8 +46,7 @@ class AmazonOrderMatcher:
         """Initialize matcher.
 
         Args:
-            order_repo: Repository for Amazon order queries. Can be Database or
-                       any object implementing AmazonOrderRepositoryProtocol.
+            order_repo: Database for Amazon order queries.
             amazon_config: Amazon configuration (provides defaults for windows/tolerance).
             stage1_window: Days for first-pass strict matching (overrides config).
             stage2_window: Days for extended matching window (overrides config).

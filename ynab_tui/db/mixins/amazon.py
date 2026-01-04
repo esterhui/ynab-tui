@@ -199,56 +199,6 @@ class AmazonMixin(CountMixin):
 
             return len(items)
 
-    def get_amazon_item_categories(self) -> dict[str, dict[str, Any]]:
-        """Get item name to category mapping from learned data.
-
-        Returns:
-            Dict mapping item_name to category info.
-        """
-        with self._connection() as conn:
-            rows = conn.execute(
-                """
-                SELECT item_name, category_id, category_name, COUNT(*) as count
-                FROM amazon_order_items
-                WHERE category_id IS NOT NULL
-                GROUP BY item_name, category_id, category_name
-                ORDER BY item_name, count DESC
-                """
-            ).fetchall()
-
-            result: dict[str, dict[str, Any]] = {}
-            for row in rows:
-                name = row["item_name"]
-                if name not in result:
-                    result[name] = {
-                        "category_id": row["category_id"],
-                        "category_name": row["category_name"],
-                        "count": row["count"],
-                    }
-            return result
-
-    def set_amazon_item_category(self, item_name: str, category_id: str, category_name: str) -> int:
-        """Set category for all matching Amazon items (for learning).
-
-        Args:
-            item_name: Item name to update.
-            category_id: YNAB category ID.
-            category_name: YNAB category name.
-
-        Returns:
-            Number of items updated.
-        """
-        with self._connection() as conn:
-            cursor = conn.execute(
-                """
-                UPDATE amazon_order_items
-                SET category_id = ?, category_name = ?
-                WHERE item_name = ?
-                """,
-                (category_id, category_name, item_name),
-            )
-            return cursor.rowcount
-
     def get_amazon_order_items_with_prices(self, order_id: str) -> list[dict[str, Any]]:
         """Get order items with prices for split transaction matching.
 

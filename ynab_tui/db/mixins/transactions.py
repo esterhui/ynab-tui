@@ -388,35 +388,6 @@ class TransactionMixin(CountMixin):
 
             return [dict(row) for row in rows]
 
-    def mark_pending_push(self, transaction_id: str, category_id: str, category_name: str) -> bool:
-        """Mark a transaction as pending push after local categorization.
-
-        Args:
-            transaction_id: Transaction ID to update.
-            category_id: New category ID.
-            category_name: New category name.
-
-        Returns:
-            True if updated, False if not found.
-        """
-        with self._connection() as conn:
-            cursor = conn.execute(
-                """
-                UPDATE ynab_transactions
-                SET category_id = ?, category_name = ?,
-                    sync_status = 'pending_push',
-                    modified_at = ?
-                WHERE id = ?
-                """,
-                (
-                    category_id,
-                    category_name,
-                    _now_iso(),
-                    transaction_id,
-                ),
-            )
-            return cursor.rowcount > 0
-
     def mark_pending_split(self, transaction_id: str, splits: list[dict[str, Any]]) -> bool:
         """Mark a transaction as pending push with split information.
 
@@ -502,14 +473,6 @@ class TransactionMixin(CountMixin):
                 (transaction_id,),
             )
             return cursor.rowcount > 0
-
-    def get_pending_push_transactions(self) -> list[dict[str, Any]]:
-        """Get all transactions pending push to YNAB.
-
-        Returns:
-            List of transaction dictionaries.
-        """
-        return self.get_ynab_transactions(pending_push_only=True)
 
     def mark_synced(self, transaction_id: str) -> bool:
         """Mark a transaction as synced after successful push.

@@ -193,26 +193,9 @@ class TestTransactionMixin:
         assert len(txns) == 1
         assert txns[0]["id"] == "txn-1"
 
-    def test_mark_pending_push(self, temp_db: Database) -> None:
-        """Can mark transaction as pending push."""
-        temp_db.upsert_ynab_transaction(make_transaction())
-
-        result = temp_db.mark_pending_push("txn-001", "cat-1", "Groceries")
-        assert result is True
-
-        stored = temp_db.get_ynab_transaction("txn-001")
-        assert stored["sync_status"] == "pending_push"
-        assert stored["category_id"] == "cat-1"
-
-    def test_mark_pending_push_not_found(self, temp_db: Database) -> None:
-        """mark_pending_push returns False for non-existent."""
-        result = temp_db.mark_pending_push("nonexistent", "cat-1", "Groceries")
-        assert result is False
-
     def test_mark_synced(self, temp_db: Database) -> None:
         """Can mark transaction as synced."""
         temp_db.upsert_ynab_transaction(make_transaction())
-        temp_db.mark_pending_push("txn-001", "cat-1", "Groceries")
 
         result = temp_db.mark_synced("txn-001")
         assert result is True
@@ -239,12 +222,18 @@ class TestTransactionMixin:
         assert temp_db.get_uncategorized_count() == 1
 
     def test_get_pending_push_count(self, temp_db: Database) -> None:
-        """Can count pending push transactions."""
+        """Can count pending push transactions via pending_changes table."""
         temp_db.upsert_ynab_transaction(make_transaction("txn-1"))
         temp_db.upsert_ynab_transaction(make_transaction("txn-2"))
-        temp_db.mark_pending_push("txn-1", "cat-1", "Groceries")
+        temp_db.create_pending_change(
+            "txn-1",
+            new_values={"category_id": "cat-1", "category_name": "Groceries"},
+            original_values={"category_id": None, "category_name": None},
+        )
 
-        assert temp_db.get_pending_push_count() == 1
+        # pending_push_only=True uses pending_changes table
+        txns = temp_db.get_ynab_transactions(pending_push_only=True)
+        assert len(txns) == 1
 
     def test_get_transaction_date_range(self, temp_db: Database) -> None:
         """Can get transaction date range."""

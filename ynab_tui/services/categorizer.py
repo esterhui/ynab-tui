@@ -10,9 +10,8 @@ DB-first architecture: Run 'pull' to sync data, then all operations use local SQ
 
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional, Union
 
-from ..clients.protocols import YNABClientProtocol
 from ..config import Config
 from ..db.database import Database, TransactionFilter
 from ..models import (
@@ -25,6 +24,9 @@ from ..models import (
 from ..utils import parse_to_datetime
 from .matcher import TransactionMatcher
 
+if TYPE_CHECKING:
+    from ..clients import MockYNABClient, YNABClient
+
 logger = logging.getLogger(__name__)
 
 
@@ -34,7 +36,7 @@ class CategorizerService:
     def __init__(
         self,
         config: Config,
-        ynab_client: YNABClientProtocol,
+        ynab_client: Union["YNABClient", "MockYNABClient"],
         db: Database,
     ):
         """Initialize categorizer service.
