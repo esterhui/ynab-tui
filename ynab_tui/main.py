@@ -937,6 +937,16 @@ def pull(ctx, full, ynab, amazon, amazon_year, since_days, dry_run, fix):
             )
         )
 
+    # Remind user to push if conflicts were fixed
+    if ynab_result and ynab_result.conflicts_fixed > 0 and not dry_run:
+        click.echo(
+            click.style(
+                f"\nReminder: {ynab_result.conflicts_fixed} conflict(s) marked for push. "
+                "Run 'push' to restore categories to YNAB.",
+                fg="yellow",
+            )
+        )
+
 
 @main.command("push")
 @click.option("--dry-run", is_flag=True, help="Show what would be pushed without making changes")

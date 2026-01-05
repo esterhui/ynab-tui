@@ -466,7 +466,7 @@ class TestConflictDetection:
             category_id=None,
             category_name=None,
         )
-        was_inserted, was_changed = temp_db.upsert_ynab_transaction(ynab_txn)
+        temp_db.upsert_ynab_transaction(ynab_txn)
 
         # Should use pending category, not mark as conflict
         stored = temp_db.get_ynab_transaction("txn-pending")
