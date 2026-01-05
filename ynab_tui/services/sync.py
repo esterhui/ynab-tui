@@ -215,9 +215,15 @@ class SyncService:
                     # Dry run - compare fetched with database to get accurate counts
                     for txn in transactions:
                         existing = self._db.get_ynab_transaction(txn.id)
+                        # Check for pending change - if exists, not a conflict
+                        pending = self._db.get_pending_change(txn.id)
                         # Detect conflict: local has category but YNAB says uncategorized
+                        # (but not if there's already a pending change for this transaction)
                         is_conflict = bool(
-                            existing and existing["category_id"] and not txn.category_id
+                            existing
+                            and existing["category_id"]
+                            and not txn.category_id
+                            and not pending
                         )
                         local_category = (
                             existing["category_name"] if existing and is_conflict else ""
@@ -231,6 +237,10 @@ class SyncService:
                             local_category=local_category or "",
                         )
                         if existing:
+                            # Skip transactions with pending changes - pull won't update them
+                            if pending:
+                                continue
+
                             # Check if data would change (simplified comparison)
                             new_date = txn.date.strftime("%Y-%m-%d")
                             # Skip category_id comparison for split transactions
