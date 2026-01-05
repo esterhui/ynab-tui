@@ -78,8 +78,7 @@ class TestTUIFilterNavigation:
 
             # Test each filter key (note: 'c' and 'p' open modals, not direct filters)
             filter_tests = [
-                ("a", "approved"),
-                ("n", "new"),
+                ("a", "unapproved"),
                 ("u", "uncategorized"),
                 ("e", "pending"),  # Changed from 'p' to 'e' for pending
                 ("r", "all"),
@@ -1448,8 +1447,8 @@ class TestTransactionListItemDisplay:
             sync_status="synced",
         )
         item = TransactionListItem(txn)
-        # Initial state should have -new class
-        assert "-new" in item.classes
+        # Initial state should have -unapproved class
+        assert "-unapproved" in item.classes
 
         # Change to pending_push
         txn.sync_status = "pending_push"

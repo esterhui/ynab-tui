@@ -647,13 +647,9 @@ class TestGetTransactions:
         config = make_config()
         categorizer = CategorizerService(config, mock_ynab, temp_db)
 
-        approved = categorizer.get_transactions(filter_mode="approved")
-        assert len(approved.transactions) == 1
-        assert approved.transactions[0].id == "txn-1"
-
-        new = categorizer.get_transactions(filter_mode="new")
-        assert len(new.transactions) == 1
-        assert new.transactions[0].id == "txn-2"
+        unapproved = categorizer.get_transactions(filter_mode="unapproved")
+        assert len(unapproved.transactions) == 1
+        assert unapproved.transactions[0].id == "txn-2"
 
 
 class TestGetPendingTransactions:

@@ -26,8 +26,8 @@ class TestFilterState:
 
     def test_custom_mode(self) -> None:
         """Can create state with custom mode."""
-        state = FilterState(mode="approved")
-        assert state.mode == "approved"
+        state = FilterState(mode="unapproved")
+        assert state.mode == "unapproved"
 
     def test_invalid_mode_raises(self) -> None:
         """Invalid mode should raise ValueError."""
@@ -50,7 +50,7 @@ class TestFilterState:
         """FilterState should be immutable (frozen)."""
         state = FilterState()
         with pytest.raises(Exception):  # FrozenInstanceError
-            state.mode = "approved"  # type: ignore
+            state.mode = "unapproved"  # type: ignore
 
 
 class TestCategoryFilter:
@@ -87,18 +87,18 @@ class TestFilterStateMachine:
 
         assert new_state.is_submenu_active is False
 
-    def test_apply_mode_approved(self) -> None:
+    def test_apply_mode_unapproved(self) -> None:
         """apply_mode should set mode and close submenu."""
         state = FilterState(is_submenu_active=True)
-        new_state = FilterStateMachine.apply_mode(state, "approved")
+        new_state = FilterStateMachine.apply_mode(state, "unapproved")
 
-        assert new_state.mode == "approved"
+        assert new_state.mode == "unapproved"
         assert new_state.is_submenu_active is False
 
     def test_apply_mode_all_resets(self) -> None:
         """apply_mode('all') should reset all filters."""
         state = FilterState(
-            mode="approved",
+            mode="unapproved",
             category=CategoryFilter("id", "Cat"),
             payee="Test",
             is_submenu_active=True,
@@ -145,7 +145,7 @@ class TestFilterStateMachine:
     def test_reset(self) -> None:
         """reset should return default state."""
         state = FilterState(
-            mode="approved",
+            mode="unapproved",
             category=CategoryFilter("id", "Cat"),
             payee="Test",
         )
@@ -160,22 +160,22 @@ class TestFilterStateMachine:
 
         assert label == "All"
 
-    def test_get_display_label_approved(self) -> None:
-        """Display label for 'approved' should be 'Approved'."""
-        state = FilterState(mode="approved")
+    def test_get_display_label_unapproved(self) -> None:
+        """Display label for 'unapproved' should be 'Unapproved'."""
+        state = FilterState(mode="unapproved")
         label = FilterStateMachine.get_display_label(state)
 
-        assert label == "Approved"
+        assert label == "Unapproved"
 
     def test_get_display_label_with_category(self) -> None:
         """Display label with category should include Cat:name."""
         state = FilterState(
-            mode="approved",
+            mode="unapproved",
             category=CategoryFilter("id", "Groceries"),
         )
         label = FilterStateMachine.get_display_label(state)
 
-        assert "Approved" in label
+        assert "Unapproved" in label
         assert "Cat:Groceries" in label
 
     def test_get_display_label_with_payee(self) -> None:
@@ -215,7 +215,7 @@ class TestFilterLabels:
 
     def test_all_modes_have_labels(self) -> None:
         """All valid modes should have labels."""
-        valid_modes = {"all", "approved", "new", "uncategorized", "pending"}
+        valid_modes = {"all", "unapproved", "uncategorized", "pending"}
         for mode in valid_modes:
             assert mode in FILTER_LABELS
             assert isinstance(FILTER_LABELS[mode], str)

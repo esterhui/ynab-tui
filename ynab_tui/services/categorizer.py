@@ -271,8 +271,7 @@ class CategorizerService:
         filter_map = {
             "uncategorized": TransactionFilter.uncategorized(),
             "pending": TransactionFilter.pending(),
-            "approved": TransactionFilter.approved(),
-            "new": TransactionFilter.unapproved(),
+            "unapproved": TransactionFilter.unapproved(),
         }
         txn_filter = filter_map.get(filter_mode, TransactionFilter())
 
