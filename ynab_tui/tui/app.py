@@ -10,7 +10,6 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Container
 from textual.css.query import NoMatches
-from textual.timer import Timer
 from textual.widgets import Footer, ListItem, ListView, Static
 
 from .. import __version__
@@ -42,13 +41,6 @@ from .state import (
 )
 
 
-def _format_sync_time(timestamp: Optional[datetime]) -> str:
-    """Format sync timestamp as absolute time."""
-    if timestamp is None:
-        return "Never"
-    return timestamp.strftime("%Y-%m-%d %H:%M")
-
-
 class TransactionListItem(ListItem):
     """A list item displaying a transaction row."""
 
@@ -77,7 +69,7 @@ class TransactionListItem(ListItem):
         if txn.sync_status == "pending_push":
             self.add_class("-pending")
         elif not txn.approved:
-            self.add_class("-new")
+            self.add_class("-unapproved")
 
     def compose(self) -> ComposeResult:
         """Compose the list item content."""
@@ -86,11 +78,11 @@ class TransactionListItem(ListItem):
     def update_content(self) -> None:
         """Update the displayed content after transaction changes."""
         # Update CSS classes based on current state
-        self.remove_class("-new", "-pending")
+        self.remove_class("-unapproved", "-pending")
         if self.txn.sync_status == "pending_push":
             self.add_class("-pending")
         elif not self.txn.approved:
-            self.add_class("-new")
+            self.add_class("-unapproved")
 
         # Update text content
         try:
@@ -236,13 +228,13 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         background: $primary;
     }
 
-    /* New/unapproved transactions - different text color */
-    TransactionListItem.-new {
+    /* Unapproved transactions - different text color */
+    TransactionListItem.-unapproved {
         color: #88aacc;
     }
 
     /* When highlighted, use light cyan to distinguish from normal rows */
-    TransactionListItem.-new.-highlight {
+    TransactionListItem.-unapproved.-highlight {
         color: #ccddee;
     }
 
@@ -266,6 +258,10 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         padding: 0 1;
     }
 
+    #status-bar.filter-active {
+        background: $warning-darken-2;
+    }
+
     #loading-indicator {
         width: 100%;
         height: 100%;
@@ -279,17 +275,17 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         # Essential actions (shown in footer - 8 total)
         Binding("c", "categorize", "Category"),
         Binding("a", "approve", "Approve"),
-        Binding("m", "edit_memo", "Memo"),
+        Binding("u", "undo", "Undo"),
         Binding("f", "cycle_filter", "Filter"),
         Binding("/", "fuzzy_search", "Search"),
         Binding("p", "push_preview", "Push"),
         Binding("x", "split", "Split"),
         Binding("?", "show_help", "Help"),
         # Hidden actions (still work, not shown in footer)
+        Binding("m", "edit_memo", "Memo", show=False),
         Binding("s", "settings", "Settings", show=False),
-        Binding("u", "undo", "Undo", show=False),
         Binding("q", "quit", "Quit", show=False),
-        Binding("escape", "escape_back", "Back", show=False),
+        Binding("escape", "quit", "Quit", show=False),
         Binding("b", "switch_budget", "Budget", show=False),
         Binding("t", "toggle_tag", "Tag", show=False),
         Binding("T", "clear_all_tags", "Untag All", show=False),
@@ -297,21 +293,19 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
     ]
 
     # Filter modes and their labels
-    FILTER_MODES = ["all", "approved", "new", "uncategorized", "pending"]
+    FILTER_MODES = ["all", "unapproved", "uncategorized", "pending"]
     FILTER_LABELS = {
         "all": "All",
-        "approved": "Approved",
-        "new": "New (Unapproved)",
+        "unapproved": "Unapproved",
         "uncategorized": "Uncategorized",
         "pending": "Pending Push",
     }
     # Key mappings for filter submenu
     FILTER_KEYS = {
-        "a": "approved",
-        "n": "new",
+        "a": "unapproved",
         "u": "uncategorized",
-        "e": "pending",  # Changed from 'p' to free up for payee
-        "x": "all",
+        "e": "pending",
+        "r": "all",  # Reset to all
         "c": "category",  # Opens category filter modal
         "p": "payee",  # Opens payee filter modal
     }
@@ -338,7 +332,6 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         self._transactions: TransactionBatch = TransactionBatch()
         # Filter state (immutable - replaced on changes)
         self._filter_state = FilterState()
-        self._filter_timer: Timer | None = None  # Timer to cancel pending state
         # Tag state (immutable - replaced on changes)
         self._tag_state = TagState()
         # Budget state - will be populated on mount
@@ -370,33 +363,34 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             pass  # Header might not be mounted yet
 
     def _build_status_bar_text(self) -> str:
-        """Build the status bar text with filter stats, sync times, and optional mock indicator."""
+        """Build the status bar text with filter and counts."""
         parts = []
 
-        # Only show MOCK indicator when in mock mode (cleaner look for normal use)
+        # Mock indicator
         if self._is_mock:
             parts.append("[yellow]MOCK[/yellow]")
 
-        # Filter stats (moved from header-stats)
-        filter_label = self._get_filter_display_label()
-        parts.append(f"Filter: [b]{filter_label}[/b]")
+        # Filter label (no "Filter:" prefix)
+        parts.append(f"[b]{self._get_filter_display_label()}[/b]")
 
-        # Transaction counts
+        # Compact transaction counts
         if hasattr(self, "_transactions") and self._transactions:
             total = self._transactions.total_count
             uncategorized = sum(1 for t in self._transactions.transactions if t.is_uncategorized)
             unapproved = sum(1 for t in self._transactions.transactions if t.is_unapproved)
-            parts.append(f"[b]{total}[/b] txns")
-            if uncategorized:
-                parts.append(f"[b]{uncategorized}[/b] uncat")
-            if unapproved:
-                parts.append(f"[b]{unapproved}[/b] unappr")
+            pending = sum(1 for t in self._transactions.transactions if t.needs_push)
+            conflicts = sum(1 for t in self._transactions.transactions if t.has_conflict)
 
-        # Sync time (YNAB only)
-        sync_status = self._categorizer.get_sync_status()
-        ynab_sync = sync_status["ynab"]
-        ynab_time = _format_sync_time(ynab_sync.get("last_sync_at") if ynab_sync else None)
-        parts.append(f"YNAB: {ynab_time}")
+            counts = [str(total)]
+            if uncategorized:
+                counts.append(f"{uncategorized} uncat")
+            if unapproved:
+                counts.append(f"[cyan]{unapproved} unapproved[/cyan]")
+            if pending:
+                counts.append(f"[green]{pending} pending[/green]")
+            if conflicts:
+                counts.append(f"[red]{conflicts} ![/red]")
+            parts.append(" / ".join(counts))
 
         return " │ ".join(parts)
 
@@ -415,7 +409,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         self._column_widths = calculate_column_widths(self.size.width)
         # Initialize budget info
         await self._init_budget()
-        self.run_worker(self._load_transactions(), exclusive=True)
+        self.run_worker(self._load_transactions, exclusive=True)  # type: ignore[arg-type]
 
     def on_resize(self, event) -> None:
         """Handle terminal resize - recalculate column widths."""
@@ -423,7 +417,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         if new_widths != self._column_widths:
             self._column_widths = new_widths
             # Re-render transactions with new widths
-            self.run_worker(self._render_transactions(), exclusive=True)
+            self.run_worker(self._render_transactions, exclusive=True)  # type: ignore[arg-type]
 
     async def _init_budget(self) -> None:
         """Initialize budget state from the YNAB client."""
@@ -516,43 +510,68 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         header = format_header_row(self._column_widths)
         return Static(header, classes="transaction-header")
 
+    async def _refresh_after_push(self, pushed_ids: list[str]) -> None:
+        """Refresh UI after push without full rebuild.
+
+        Updates only affected rows and preserves current selection.
+
+        Args:
+            pushed_ids: Transaction IDs that were successfully pushed.
+        """
+        if not pushed_ids:
+            return
+
+        pushed_id_set = set(pushed_ids)
+
+        try:
+            txn_list = self.query_one("#transactions-list", ListView)
+        except NoMatches:
+            await self._load_transactions()  # Fallback
+            return
+
+        current_index = txn_list.index
+
+        # Handle "pending" filter - items should be removed from view
+        if self._filter_state.mode == "pending":
+            items_to_remove = [
+                child
+                for child in txn_list.children
+                if isinstance(child, TransactionListItem) and child.txn.id in pushed_id_set
+            ]
+            for item in items_to_remove:
+                await item.remove()
+
+            # Update cached transaction list
+            self._transactions.transactions = [
+                t for t in self._transactions.transactions if t.id not in pushed_id_set
+            ]
+
+            # Restore selection (same index or adjust if out of bounds)
+            remaining = len(list(txn_list.children))
+            if remaining > 0:
+                txn_list.index = min(current_index or 0, remaining - 1)
+        else:
+            # Other filters: update sync_status on affected rows
+            for child in txn_list.children:
+                if isinstance(child, TransactionListItem) and child.txn.id in pushed_id_set:
+                    child.txn.sync_status = "synced"
+                    # Also update cached list
+                    for txn in self._transactions.transactions:
+                        if txn.id == child.txn.id:
+                            txn.sync_status = "synced"
+                            break
+                    child.update_content()
+
+        # Update status bar
+        self._restore_status_bar()
+
     async def action_quit(self) -> None:
         """Handle quit action."""
         self.exit()
 
-    def action_escape_back(self) -> None:
-        """Handle Escape key - progressively dismiss UI elements."""
-        # 1. Cancel filter submenu if active
-        if self._filter_state.is_submenu_active:
-            self._cancel_filter_pending()
-            return
-
-        # 2. Clear filters if any are applied
-        if self._has_active_filters():
-            self._clear_all_filters()
-            return
-
-        # 3. Otherwise quit
-        self.exit()
-
-    def _has_active_filters(self) -> bool:
-        """Check if any filters are currently applied."""
-        return (
-            self._filter_state.mode != "all"
-            or self._filter_state.category is not None
-            or self._filter_state.payee is not None
-        )
-
-    def _clear_all_filters(self) -> None:
-        """Clear all active filters and refresh."""
-        self._filter_state = FilterStateMachine.reset(self._filter_state)
-        self._restore_status_bar()
-        self.notify("Filters cleared", timeout=1)
-        self.run_worker(self._load_transactions(), exclusive=True)
-
     def action_refresh(self) -> None:
         """Refresh transactions."""
-        self.run_worker(self._load_transactions(), exclusive=True)
+        self.run_worker(self._load_transactions, exclusive=True)  # type: ignore[arg-type]
 
     def action_toggle_tag(self) -> None:
         """Toggle tag on the currently selected transaction for bulk actions."""
@@ -611,50 +630,74 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
 
     def action_cycle_filter(self) -> None:
         """Show filter menu in status bar and wait for sub-key."""
-        # Cancel any existing timer
-        if self._filter_timer is not None:
-            self._filter_timer.stop()
-            self._filter_timer = None
-
         # Enter filter submenu mode
         self._filter_state = FilterStateMachine.enter_submenu(self._filter_state)
         filter_text = (
-            "[bold yellow]Filter (press key within 3s):[/bold yellow] "
-            "[bold cyan]a[/bold cyan]=Approved  "
-            "[bold cyan]n[/bold cyan]=New  "
-            "[bold cyan]u[/bold cyan]=Uncategorized  "
-            "[bold cyan]e[/bold cyan]=Pending  "
-            "[bold cyan]c[/bold cyan]=Category  "
-            "[bold cyan]p[/bold cyan]=Payee  "
-            "[bold cyan]x[/bold cyan]=All"
+            "[yellow]Filter:[/yellow] "
+            "un[cyan]a[/cyan]pproved "
+            "[cyan]u[/cyan]ncat "
+            "p[cyan]e[/cyan]nding "
+            "[cyan]c[/cyan]ategory "
+            "[cyan]p[/cyan]ayee "
+            "[cyan]r[/cyan]eset"
         )
         self._update_status_bar(filter_text)
-
-        # Set timer to cancel pending state after 3 seconds
-        self._filter_timer = self.set_timer(3.0, self._cancel_filter_pending)
+        # Add visual indicator that filter menu is active
+        self._set_filter_menu_active(True)
 
     def _cancel_filter_pending(self) -> None:
-        """Cancel filter pending state after timeout."""
+        """Cancel filter pending state."""
         self._filter_state = FilterStateMachine.cancel_submenu(self._filter_state)
-        self._filter_timer = None
+        self._set_filter_menu_active(False)
         self._restore_status_bar()
+
+    def _set_filter_menu_active(self, active: bool) -> None:
+        """Toggle visual indicator for filter menu mode."""
+        try:
+            status_bar = self.query_one("#status-bar", Static)
+            if active:
+                status_bar.add_class("filter-active")
+            else:
+                status_bar.remove_class("filter-active")
+        except Exception:
+            pass  # Status bar might not exist yet
 
     def _apply_filter(self, filter_mode: str) -> None:
         """Apply a filter mode and reload transactions."""
         self._filter_state = FilterStateMachine.apply_mode(self._filter_state, filter_mode)
-        if self._filter_timer is not None:
-            self._filter_timer.stop()
-            self._filter_timer = None
+        self._set_filter_menu_active(False)
         self._restore_status_bar()
         self.notify(f"Filter: {self._get_filter_display_label()}", timeout=2)
-        self.run_worker(self._load_transactions(), exclusive=True)
+        self.run_worker(self._load_transactions, exclusive=True)  # type: ignore[arg-type]
 
     def _get_filter_display_label(self) -> str:
         """Get the display label for current filter state including category/payee."""
         return FilterStateMachine.get_display_label(self._filter_state)
 
     def on_key(self, event) -> None:
-        """Handle key events for filter sub-keys."""
+        """Handle key events for filter sub-keys and page navigation."""
+        # Intercept page/home/end keys to move highlight (not just scroll)
+        if event.key == "pagedown":
+            self.action_page_down()
+            event.stop()
+            event.prevent_default()
+            return
+        elif event.key == "pageup":
+            self.action_page_up()
+            event.stop()
+            event.prevent_default()
+            return
+        elif event.key == "home":
+            self.action_scroll_home()
+            event.stop()
+            event.prevent_default()
+            return
+        elif event.key == "end":
+            self.action_scroll_end()
+            event.stop()
+            event.prevent_default()
+            return
+
         # Handle filter sub-keys
         if self._filter_state.is_submenu_active and event.key in self.FILTER_KEYS:
             event.stop()  # Stop event propagation
@@ -792,7 +835,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                     item.update_content()  # Update the Static widget's text
         except Exception:
             # Fallback to full re-render if something goes wrong
-            self.run_worker(self._render_transactions(), exclusive=True)
+            self.run_worker(self._render_transactions, exclusive=True)  # type: ignore[arg-type]
 
     def _on_bulk_category_selected(self, result: Optional[CategorySelection]) -> None:
         """Handle category selection for bulk tagging."""
@@ -813,7 +856,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         self._tag_state = TagManager.clear_all(self._tag_state)
 
         # Refresh display
-        self.run_worker(self._render_transactions(), exclusive=True)
+        self.run_worker(self._render_transactions, exclusive=True)  # type: ignore[arg-type]
         self.notify(action_result.message)
 
     def action_fuzzy_search(self) -> None:
@@ -860,7 +903,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             if self._filter_state.category:
                 self._filter_state = FilterStateMachine.clear_category(self._filter_state)
                 self.notify("Category filter cleared", timeout=2)
-                self.run_worker(self._load_transactions(), exclusive=True)
+                self.run_worker(self._load_transactions, exclusive=True)  # type: ignore[arg-type]
             return
         # Convert modal result to our state type
         cat_filter = CategoryFilter(
@@ -869,7 +912,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         )
         self._filter_state = FilterStateMachine.set_category(self._filter_state, cat_filter)
         self.notify(f"Filtering by: {result.category_name}", timeout=2)
-        self.run_worker(self._load_transactions(), exclusive=True)
+        self.run_worker(self._load_transactions, exclusive=True)  # type: ignore[arg-type]
 
     def _open_payee_filter(self) -> None:
         """Open the payee filter modal."""
@@ -893,11 +936,11 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             if self._filter_state.payee:
                 self._filter_state = FilterStateMachine.clear_payee(self._filter_state)
                 self.notify("Payee filter cleared", timeout=2)
-                self.run_worker(self._load_transactions(), exclusive=True)
+                self.run_worker(self._load_transactions, exclusive=True)  # type: ignore[arg-type]
             return
         self._filter_state = FilterStateMachine.set_payee(self._filter_state, result)
         self.notify(f"Filtering by payee: {result}", timeout=2)
-        self.run_worker(self._load_transactions(), exclusive=True)
+        self.run_worker(self._load_transactions, exclusive=True)  # type: ignore[arg-type]
 
     def action_split(self) -> None:
         """Open split screen for Amazon transactions."""
@@ -991,7 +1034,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                     item.update_content()
         except Exception:
             # Fallback to full re-render if something goes wrong
-            self.run_worker(self._render_transactions(), exclusive=True)
+            self.run_worker(self._render_transactions, exclusive=True)  # type: ignore[arg-type]
 
     def action_undo(self) -> None:
         """Undo pending category change on selected transaction."""
@@ -1018,7 +1061,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                         item.update_content()
             except Exception:
                 # Fallback to full re-render
-                self.run_worker(self._render_transactions(), exclusive=True)
+                self.run_worker(self._render_transactions, exclusive=True)  # type: ignore[arg-type]
         else:
             self.notify(action_result.error or "Failed to undo", severity="error")
 
@@ -1037,7 +1080,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             self._tag_state = TagManager.clear_all(self._tag_state)
 
             # Refresh display
-            self.run_worker(self._render_transactions(), exclusive=True)
+            self.run_worker(self._render_transactions, exclusive=True)  # type: ignore[arg-type]
             self.notify(action_result.message)
         else:
             # Single item mode
@@ -1064,7 +1107,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                             item.update_content()
                 except Exception:
                     # Fallback to full re-render
-                    self.run_worker(self._render_transactions(), exclusive=True)
+                    self.run_worker(self._render_transactions, exclusive=True)  # type: ignore[arg-type]
             else:
                 self.notify(action_result.error or "Failed to approve", severity="error")
 
@@ -1109,7 +1152,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                     if isinstance(item, TransactionListItem):
                         item.update_content()
             except Exception:
-                self.run_worker(self._render_transactions(), exclusive=True)
+                self.run_worker(self._render_transactions, exclusive=True)  # type: ignore[arg-type]
         else:
             self.notify(action_result.error or "Failed to update memo", severity="error")
 
@@ -1163,7 +1206,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         # Update header and reload transactions
         self._update_header()
         self.notify(f"Switched to: {result.budget_name}")
-        self.run_worker(self._load_transactions(), exclusive=True)
+        self.run_worker(self._load_transactions, exclusive=True)  # type: ignore[arg-type]
 
     def action_push_preview(self) -> None:
         """Show push preview screen with pending changes."""
@@ -1176,6 +1219,9 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         """Handle Enter key on ListView - open category picker modal."""
+        # Only respond to events from the main transaction list, not child screens
+        if event.list_view.id != "transactions-list":
+            return
         # Same as pressing 'c' - open category picker for selected transaction
         self.action_categorize()
 

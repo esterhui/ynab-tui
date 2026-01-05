@@ -11,9 +11,8 @@ import pytest
 from ynab_tui.config import CategorizationConfig, PayeesConfig
 from ynab_tui.db.database import AmazonOrderCache, Database
 from ynab_tui.models import Transaction
-from ynab_tui.services.amazon_matcher import TransactionInfo
+from ynab_tui.services.amazon_matcher import AmazonMatchResult, TransactionInfo
 from ynab_tui.services.matcher import TransactionMatcher
-from ynab_tui.services.matching import AmazonMatchResult
 
 
 class MockAmazonMatcher:

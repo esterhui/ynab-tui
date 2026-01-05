@@ -228,7 +228,7 @@ class TestPullCommand:
         """
         # Pull with --budget flag
         result = cli_runner.invoke(
-            main, ["--mock", "--budget", "Mock Budget", "pull", "--ynab-only", "--full"]
+            main, ["--mock", "--budget", "Mock Budget", "pull", "--ynab", "--full"]
         )
         assert result.exit_code == 0
 
@@ -249,28 +249,26 @@ class TestPullCommand:
             )
 
     def test_pull_ynab_only(self, cli_runner, isolated_mock_env):
-        """Test pull --ynab-only command."""
-        result = cli_runner.invoke(main, ["--mock", "pull", "--ynab-only"])
+        """Test pull --ynab command."""
+        result = cli_runner.invoke(main, ["--mock", "pull", "--ynab"])
         assert result.exit_code == 0
         assert "YNAB" in result.output
 
     def test_pull_amazon_only(self, cli_runner, isolated_mock_env, monkeypatch):
-        """Test pull --amazon-only command."""
+        """Test pull --amazon command."""
         monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
-        result = cli_runner.invoke(main, ["--mock", "pull", "--amazon-only"])
+        result = cli_runner.invoke(main, ["--mock", "pull", "--amazon"])
         assert result.exit_code == 0
         assert "Amazon" in result.output
 
     def test_pull_amazon_year(self, cli_runner, isolated_mock_env, monkeypatch):
-        """Test pull --amazon-only --amazon-year command."""
+        """Test pull --amazon --amazon-year command."""
         monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
-        result = cli_runner.invoke(
-            main, ["--mock", "pull", "--amazon-only", "--amazon-year", "2024"]
-        )
+        result = cli_runner.invoke(main, ["--mock", "pull", "--amazon", "--amazon-year", "2024"])
         assert result.exit_code == 0
 
 
@@ -412,7 +410,7 @@ class TestPushCommandExtended:
         # First add some data then create a pending change
         monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
-        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab", "--full"])
 
         # Try to push but cancel
         result = cli_runner.invoke(main, ["--mock", "push"], input="n\n")
@@ -477,7 +475,7 @@ class TestDBTransactionsCommandExtended:
         """Test db-transactions with multiple filters combined."""
         monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
-        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab", "--full"])
 
         result = cli_runner.invoke(
             main, ["--mock", "db-transactions", "--uncategorized", "-n", "5"]
@@ -492,7 +490,7 @@ class TestYNABUnapprovedCommandExtended:
         """Test ynab-unapproved after pulling data."""
         monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
-        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab", "--full"])
 
         result = cli_runner.invoke(main, ["--mock", "ynab-unapproved"])
         assert result.exit_code == 0
@@ -567,7 +565,7 @@ class TestDBAmazonOrdersDisplay:
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
         # Pull Amazon data
-        cli_runner.invoke(main, ["--mock", "pull", "--amazon-only"])
+        cli_runner.invoke(main, ["--mock", "pull", "--amazon"])
 
         result = cli_runner.invoke(main, ["--mock", "db-amazon-orders", "--days", "3650"])
         assert result.exit_code == 0
@@ -580,7 +578,7 @@ class TestDBAmazonOrdersDisplay:
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
         # Pull Amazon data
-        cli_runner.invoke(main, ["--mock", "pull", "--amazon-only"])
+        cli_runner.invoke(main, ["--mock", "pull", "--amazon"])
 
         result = cli_runner.invoke(main, ["--mock", "db-amazon-orders", "--year", "2024"])
         assert result.exit_code == 0
@@ -595,7 +593,7 @@ class TestUndoSpecificTransaction:
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
         # Pull data first
-        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab", "--full"])
 
         # Get a transaction ID from the database
         from ynab_tui.db.database import Database
@@ -617,7 +615,7 @@ class TestUndoSpecificTransaction:
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
         # Pull data first
-        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab", "--full"])
 
         from ynab_tui.db.database import Database
 
@@ -658,7 +656,7 @@ class TestDBTransactionsFilters:
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
         # Pull data first
-        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab", "--full"])
 
         result = cli_runner.invoke(main, ["--mock", "db-transactions", "--year", "2024"])
         assert result.exit_code == 0
@@ -669,7 +667,7 @@ class TestDBTransactionsFilters:
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
         # Pull data first
-        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab", "--full"])
 
         result = cli_runner.invoke(
             main, ["--mock", "db-transactions", "--year", "2024", "--payee", "Amazon"]
@@ -690,13 +688,11 @@ class TestPullCommandVariants:
         assert "Pull complete" in result.output
 
     def test_pull_with_specific_amazon_year(self, cli_runner, isolated_mock_env, monkeypatch):
-        """Test pull --amazon-only --amazon-year for specific year."""
+        """Test pull --amazon --amazon-year for specific year."""
         monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
-        result = cli_runner.invoke(
-            main, ["--mock", "pull", "--amazon-only", "--amazon-year", "2023"]
-        )
+        result = cli_runner.invoke(main, ["--mock", "pull", "--amazon", "--amazon-year", "2023"])
         assert result.exit_code == 0
 
 
@@ -709,7 +705,7 @@ class TestPushCommandVariants:
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
         # Pull data first
-        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab", "--full"])
 
         from ynab_tui.db.database import Database
 
@@ -747,7 +743,7 @@ class TestDBDeltasWithChanges:
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
         # Pull data first
-        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab", "--full"])
 
         from ynab_tui.db.database import Database
 
@@ -788,7 +784,7 @@ class TestYNABCategoriesCSVExport:
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
         # Pull data to populate categories
-        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab", "--full"])
 
         csv_file = tmp_path / "categories.csv"
         result = cli_runner.invoke(main, ["--mock", "ynab-categories", "--csv", str(csv_file)])
@@ -808,7 +804,7 @@ class TestYNABUnapprovedCSVExport:
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
         # Pull data
-        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab", "--full"])
 
         csv_file = tmp_path / "unapproved.csv"
         result = cli_runner.invoke(main, ["--mock", "ynab-unapproved", "--csv", str(csv_file)])
@@ -828,7 +824,7 @@ class TestDBTransactionsOutput:
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
         # Pull data
-        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab", "--full"])
 
         result = cli_runner.invoke(main, ["--mock", "db-transactions", "--limit", "5"])
         assert result.exit_code == 0
@@ -841,7 +837,7 @@ class TestDBTransactionsOutput:
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
         # Pull data
-        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab", "--full"])
 
         result = cli_runner.invoke(main, ["--mock", "db-transactions", "--all"])
         assert result.exit_code == 0
@@ -926,7 +922,7 @@ class TestDBAmazonOrdersOutput:
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
         # Pull Amazon data
-        cli_runner.invoke(main, ["--mock", "pull", "--amazon-only"])
+        cli_runner.invoke(main, ["--mock", "pull", "--amazon"])
 
         result = cli_runner.invoke(main, ["--mock", "db-amazon-orders", "--days", "3650"])
         assert result.exit_code == 0
@@ -941,7 +937,7 @@ class TestAdditionalCLIEdgeCases:
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
         # Pull data but don't create any pending changes
-        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab", "--full"])
 
         result = cli_runner.invoke(main, ["--mock", "push"])
         assert result.exit_code == 0
@@ -973,7 +969,7 @@ class TestAdditionalCLIEdgeCases:
         monkeypatch.setenv("AMAZON_USERNAME", "test@example.com")
         monkeypatch.setenv("AMAZON_PASSWORD", "test-password")
 
-        cli_runner.invoke(main, ["--mock", "pull", "--ynab-only", "--full"])
+        cli_runner.invoke(main, ["--mock", "pull", "--ynab", "--full"])
 
         result = cli_runner.invoke(main, ["--mock", "ynab-categories"])
         assert result.exit_code == 0

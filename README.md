@@ -86,21 +86,25 @@ ynab-tui --version
 ```
 
 **Vim-style keybindings:**
-- `j/k` or arrows - Navigate up/down
+- `j/k` - Navigate up/down
 - `g/G` - Go to top/bottom
-- `Ctrl+d/u` - Page down/up
-- `c` - Categorize selected transaction
-- `a` - Approve transaction
-- `x` - Split transaction (for Amazon orders)
-- `u` - Undo last change
-- `p` - Preview pending changes
+- `Ctrl+d/u` - Half page down/up
+- `c` - Categorize (bulk if tagged)
+- `a` - Approve (bulk if tagged)
+- `u` - Undo pending change
+- `x` - Split (Amazon multi-item)
+- `p` - Push pending changes
 - `/` - Search transactions
-- `f` - Cycle filter (all/approved/uncategorized/pending)
-- `t` - Tag transaction for bulk operations
+- `f` - Filter menu (then: `a`pproved `n`ew `u`ncat p`e`nding `c`ategory `p`ayee `r`eset)
+- `t` - Tag/untag for bulk operations
 - `T` - Clear all tags
 - `b` - Switch budget
+- `m` - Edit memo
 - `s` - Settings
 - `?` - Help
+- `Enter` - Categorize selected (same as `c`)
+- `Escape` - Quit (same as `q`)
+- `F5` - Refresh transactions
 - `q` - Quit
 
 ### CLI Commands
@@ -112,6 +116,7 @@ ynab-tui init              # Create config file at ~/.config/ynab-tui/config.tom
 # Sync commands (git-style pull/push)
 ynab-tui pull              # Pull YNAB + Amazon data to local DB
 ynab-tui pull --full       # Full pull of all data
+ynab-tui pull --fix        # Fix conflicts by marking for push to YNAB
 ynab-tui push              # Push local categorizations to YNAB
 ynab-tui push --dry-run    # Preview what would be pushed
 
@@ -188,6 +193,56 @@ chmod 600 ~/.config/ynab-tui/*.db
 
 Database encryption is planned for a future release.
 
+### Logging
+
+Logs use Python's standard logging module. By default, **WARNING+ logs go to stderr**.
+
+To see INFO level logs (push verification, conflict detection):
+
+```bash
+# Add to your shell before running ynab-tui:
+export PYTHONWARNINGS=default
+python -c "import logging; logging.basicConfig(level=logging.INFO)" && ynab-tui
+
+# Or create a wrapper script with logging enabled
+```
+
+**What gets logged:**
+- **WARNING**: Conflict detection (YNAB returned uncategorized but local has category)
+- **WARNING**: Push verification failures
+- **INFO**: Push verification success details (category sent/received)
+
+### Conflict Detection
+
+If YNAB resets a categorized transaction to "Uncategorized" (e.g., due to bank re-import), ynab-tui detects this as a **conflict**:
+
+- **Local category is preserved** (not overwritten by YNAB's "Uncategorized")
+- **Transaction shows "!" flag** in the TUI status column
+- **Warning logged** with transaction ID and preserved category
+
+This protects your categorization work from being lost when banks re-import transactions.
+
+**Resolving conflicts with `--fix`:**
+
+When conflicts are detected, you can use `pull --fix` to mark them for push back to YNAB:
+
+```bash
+# See what conflicts exist
+ynab-tui pull --dry-run
+# Output: ! CONFLICTS (local category preserved):
+# ! 2025-12-21   Trader Joe's   $-177.28  Groceries→Uncat
+
+# Fix conflicts (mark local categories for push)
+ynab-tui pull --fix
+# Output: F FIXED (will push on next 'push'):
+# F 2025-12-21   Trader Joe's   $-177.28  Groceries
+
+# Push the fixed categories back to YNAB
+ynab-tui push
+```
+
+The `--fix` flag creates pending changes that will restore your local categories to YNAB on the next push.
+
 ### Typical Workflow
 
 **First time setup:**
@@ -207,7 +262,7 @@ ynab-tui
 # 3. In the TUI: navigate with j/k, categorize with 'c', approve with 'a'
 #    For Amazon orders, use 'x' to split into individual items
 
-# 4. Push your changes back to YNAB (from CLI or use 'P' in TUI)
+# 4. Push your changes back to YNAB (from CLI or use 'p' in TUI)
 ynab-tui push
 
 # Optional: preview changes before pushing

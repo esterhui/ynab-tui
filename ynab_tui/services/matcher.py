@@ -9,16 +9,13 @@ Uses database cache for Amazon order lookups (data populated via 'pull' command)
 
 import logging
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional, Union
+from typing import Optional
 
 from ..config import CategorizationConfig, PayeesConfig
 from ..db.database import AmazonOrderCache, Database
 from ..models import AmazonOrder, OrderItem, OrderMatch, Transaction
 from ..utils import is_amazon_payee
 from .amazon_matcher import AmazonOrderMatcher, TransactionInfo
-
-if TYPE_CHECKING:
-    from .protocols import AmazonMatcherProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +28,7 @@ class TransactionMatcher:
         db: Database,
         categorization_config: CategorizationConfig,
         payees_config: PayeesConfig,
-        amazon_matcher: Optional[Union[AmazonOrderMatcher, "AmazonMatcherProtocol"]] = None,
+        amazon_matcher: Optional[AmazonOrderMatcher] = None,
     ):
         """Initialize matcher.
 

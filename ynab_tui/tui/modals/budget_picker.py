@@ -18,7 +18,7 @@ class BudgetSelection:
 class BudgetPickerModal(FuzzySelectModal[BudgetSelection]):
     """fzf-style fuzzy budget picker modal.
 
-    Opens as an overlay, type to filter, arrow keys to navigate, Enter to select.
+    Opens as an overlay, type to filter, j/k to navigate, Enter to select.
     Returns BudgetSelection on success, None on cancel.
     """
 

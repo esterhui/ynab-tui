@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 from tqdm import tqdm
 
@@ -19,8 +19,36 @@ from ynab_tui.config import AmazonConfig, CategorizationConfig
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from ..clients import AmazonClientProtocol, YNABClientProtocol
+    from ..clients import AmazonClient, MockAmazonClient, MockYNABClient, YNABClient
     from ..db.database import Database
+
+
+@dataclass
+class CategoryDetail:
+    """Category info for dry-run display."""
+
+    name: str
+    group_name: str
+
+
+@dataclass
+class TransactionDetail:
+    """Transaction info for dry-run display."""
+
+    date: datetime
+    payee_name: str
+    amount: float  # In dollars, not milliunits
+    is_conflict: bool = False  # True if YNAB uncategorized but local has category
+    local_category: str = ""  # Local category name (for conflict display)
+
+
+@dataclass
+class AmazonOrderDetail:
+    """Amazon order info for dry-run display."""
+
+    order_id: str
+    order_date: datetime
+    total: float
 
 
 @dataclass
@@ -36,6 +64,13 @@ class PullResult:
     # Date range of fetched records
     oldest_date: Optional[datetime] = None
     newest_date: Optional[datetime] = None
+    # Detailed items for dry-run display
+    details_to_insert: list[Any] = field(default_factory=list)
+    details_to_update: list[Any] = field(default_factory=list)
+    # Conflict tracking
+    conflicts_found: int = 0  # Number of conflicts detected
+    conflicts_fixed: int = 0  # Number of conflicts marked for push (--fix)
+    fixed_conflicts: list[dict] = field(default_factory=list)  # Details of fixed conflicts
 
     @property
     def success(self) -> bool:
@@ -51,6 +86,7 @@ class PushResult:
     succeeded: int = 0
     failed: int = 0
     errors: list[str] = field(default_factory=list)
+    pushed_ids: list[str] = field(default_factory=list)  # Successfully pushed IDs
     summary: str = ""  # Human-readable summary of pending changes
 
     @property
@@ -70,8 +106,8 @@ class SyncService:
     def __init__(
         self,
         db: Database,
-        ynab: YNABClientProtocol,
-        amazon: Optional[AmazonClientProtocol] = None,
+        ynab: Union["YNABClient", "MockYNABClient"],
+        amazon: Optional[Union["AmazonClient", "MockAmazonClient"]] = None,
         categorization_config: Optional[CategorizationConfig] = None,
         amazon_config: Optional[AmazonConfig] = None,
     ):
@@ -115,11 +151,20 @@ class SyncService:
                 logger.debug("Failed to fetch Amazon orders for year %d: %s", year, e)
         return orders
 
-    def pull_ynab(self, full: bool = False) -> PullResult:
+    def pull_ynab(
+        self,
+        full: bool = False,
+        since_days: Optional[int] = None,
+        dry_run: bool = False,
+        fix: bool = False,
+    ) -> PullResult:
         """Pull YNAB transactions to local database.
 
         Args:
             full: If True, pull all transactions. If False, incremental from last sync.
+            since_days: If provided, fetch transactions from the last N days (ignores sync state).
+            dry_run: If True, fetch but don't write to database.
+            fix: If True, mark conflicts as pending_push so next push will update YNAB.
 
         Returns:
             PullResult with statistics.
@@ -129,7 +174,10 @@ class SyncService:
         try:
             # Determine since_date for incremental sync
             since_date = None
-            if not full:
+            if since_days is not None:
+                # Explicit day range - skip sync state check
+                since_date = datetime.now() - timedelta(days=since_days)
+            elif not full:
                 sync_state = self._db.get_sync_state("ynab")
                 if sync_state and sync_state.get("last_sync_date"):
                     # Go back sync_overlap_days to catch any delayed transactions
@@ -140,22 +188,91 @@ class SyncService:
             transactions = self._ynab.get_all_transactions(since_date=since_date)
             result.fetched = len(transactions)
 
-            # Upsert into database with progress bar
             if transactions:
-                with tqdm(total=len(transactions), desc="Storing transactions", unit="txn") as pbar:
-                    inserted, updated = self._db.upsert_ynab_transactions(transactions)
-                    pbar.update(len(transactions))
-                result.inserted = inserted
-                result.updated = updated
-
                 # Find date range of fetched transactions
                 result.oldest_date = min(t.date for t in transactions)
                 result.newest_date = max(t.date for t in transactions)
 
-            # Update sync state
+                if not dry_run:
+                    # Upsert into database with progress bar
+                    with tqdm(
+                        total=len(transactions), desc="Storing transactions", unit="txn"
+                    ) as pbar:
+                        inserted, updated = self._db.upsert_ynab_transactions(transactions)
+                        pbar.update(len(transactions))
+                    result.inserted = inserted
+                    result.updated = updated
+
+                    # Check for conflicts and optionally fix them
+                    conflicts = self._db.get_conflict_transactions()
+                    result.conflicts_found = len(conflicts)
+                    if fix and conflicts:
+                        for conflict in conflicts:
+                            if self._db.fix_conflict_transaction(conflict["id"]):
+                                result.conflicts_fixed += 1
+                                result.fixed_conflicts.append(conflict)
+                else:
+                    # Dry run - compare fetched with database to get accurate counts
+                    for txn in transactions:
+                        existing = self._db.get_ynab_transaction(txn.id)
+                        # Check for pending change - if exists, not a conflict
+                        pending = self._db.get_pending_change(txn.id)
+                        # Detect conflict: local has category but YNAB says uncategorized
+                        # (but not if there's already a pending change for this transaction)
+                        is_conflict = bool(
+                            existing
+                            and existing["category_id"]
+                            and not txn.category_id
+                            and not pending
+                        )
+                        local_category = (
+                            existing["category_name"] if existing and is_conflict else ""
+                        )
+                        # txn.amount is already in dollars (converted in _convert_transaction)
+                        detail = TransactionDetail(
+                            date=txn.date,
+                            payee_name=txn.payee_name or "",
+                            amount=txn.amount,
+                            is_conflict=is_conflict,
+                            local_category=local_category or "",
+                        )
+                        if existing:
+                            # Skip transactions with pending changes - pull won't update them
+                            if pending:
+                                continue
+
+                            # Check if data would change (simplified comparison)
+                            new_date = txn.date.strftime("%Y-%m-%d")
+                            # Skip category_id comparison for split transactions
+                            # (Split pseudo-category ID varies, but category_name="Split" is consistent)
+                            is_split_match = (
+                                existing["is_split"]
+                                and txn.is_split
+                                and existing["category_name"] == "Split"
+                                and txn.category_name == "Split"
+                            )
+                            category_changed = (
+                                not is_split_match and existing["category_id"] != txn.category_id
+                            )
+                            if (
+                                existing["date"][:10] != new_date
+                                or existing["amount"] != txn.amount
+                                or existing["payee_name"] != txn.payee_name
+                                or category_changed
+                                or existing["memo"] != txn.memo
+                                or existing["approved"] != txn.approved
+                            ):
+                                result.updated += 1
+                                result.details_to_update.append(detail)
+                            if is_conflict:
+                                result.conflicts_found += 1
+                        else:
+                            result.inserted += 1
+                            result.details_to_insert.append(detail)
+
+            # Update sync state (skip in dry run)
             result.total = self._db.get_transaction_count()
-            # Always update sync state with current time (when sync actually ran)
-            if transactions or result.total > 0:
+            if not dry_run and (transactions or result.total > 0):
                 self._db.update_sync_state("ynab", datetime.now(), result.total)
 
         except Exception as e:
@@ -168,6 +285,7 @@ class SyncService:
         full: bool = False,
         year: Optional[int] = None,
         since_days: Optional[int] = None,
+        dry_run: bool = False,
     ) -> PullResult:
         """Pull Amazon orders to local database.
 
@@ -175,6 +293,7 @@ class SyncService:
             full: If True, pull all orders. If False, incremental.
             year: Specific year to pull (overrides incremental logic).
             since_days: Fetch orders from last N days (ignores sync state).
+            dry_run: If True, fetch but don't write to database.
 
         Returns:
             PullResult with statistics.
@@ -209,50 +328,73 @@ class SyncService:
 
             result.fetched = len(orders)
 
-            # Cache orders and store items
-            for order in tqdm(orders, desc="Storing orders", unit="order", leave=False):
-                # Cache the order header - returns (was_inserted, was_changed)
-                was_inserted, was_changed = self._db.cache_amazon_order(
-                    order_id=order.order_id,
-                    order_date=order.order_date,
-                    total=order.total,
-                )
-
-                if was_inserted:
-                    result.inserted += 1
-                elif was_changed:
-                    result.updated += 1
-                # If not inserted and not changed, don't count it
-
-                # Store individual items (source of truth for item data)
-                items = [
-                    {
-                        "name": item.name,
-                        "price": item.price if hasattr(item, "price") else None,
-                        "quantity": item.quantity if hasattr(item, "quantity") else 1,
-                    }
-                    for item in order.items
-                ]
-                self._db.upsert_amazon_order_items(order.order_id, items)
-
-            # Update sync state and date range
-            result.total = self._db.get_order_count()
             if orders:
                 result.oldest_date = min(o.order_date for o in orders)
                 result.newest_date = max(o.order_date for o in orders)
-            # Always update sync state with current time (when sync actually ran)
-            if orders or result.total > 0:
-                self._db.update_sync_state("amazon", datetime.now(), result.total)
+
+            if not dry_run:
+                # Cache orders and store items
+                for order in tqdm(orders, desc="Storing orders", unit="order", leave=False):
+                    # Cache the order header - returns (was_inserted, was_changed)
+                    was_inserted, was_changed = self._db.cache_amazon_order(
+                        order_id=order.order_id,
+                        order_date=order.order_date,
+                        total=order.total,
+                    )
+
+                    if was_inserted:
+                        result.inserted += 1
+                    elif was_changed:
+                        result.updated += 1
+                    # If not inserted and not changed, don't count it
+
+                    # Store individual items (source of truth for item data)
+                    items = [
+                        {
+                            "name": item.name,
+                            "price": item.price if hasattr(item, "price") else None,
+                            "quantity": item.quantity if hasattr(item, "quantity") else 1,
+                        }
+                        for item in order.items
+                    ]
+                    self._db.upsert_amazon_order_items(order.order_id, items)
+
+                # Update sync state
+                result.total = self._db.get_order_count()
+                if orders or result.total > 0:
+                    self._db.update_sync_state("amazon", datetime.now(), result.total)
+            else:
+                # Dry run - compare fetched with database to get accurate counts
+                for order in orders:
+                    existing = self._db.get_cached_order(order.order_id)
+                    detail = AmazonOrderDetail(
+                        order_id=order.order_id,
+                        order_date=order.order_date,
+                        total=order.total,
+                    )
+                    if existing:
+                        # Check if data would change
+                        new_date = order.order_date.strftime("%Y-%m-%d")
+                        if existing["order_date"] != new_date or existing["total"] != order.total:
+                            result.updated += 1
+                            result.details_to_update.append(detail)
+                    else:
+                        result.inserted += 1
+                        result.details_to_insert.append(detail)
+                result.total = self._db.get_order_count()
 
         except Exception as e:
             result.errors.append(str(e))
 
         return result
 
-    def pull_categories(self) -> PullResult:
+    def pull_categories(self, dry_run: bool = False) -> PullResult:
         """Pull YNAB categories to local database.
 
         Categories are always fully synced (no incremental).
+
+        Args:
+            dry_run: If True, fetch but don't write to database.
 
         Returns:
             PullResult with statistics.
@@ -267,14 +409,35 @@ class SyncService:
             total_fetched = sum(len(g.categories) for g in category_list.groups)
             result.fetched = total_fetched
 
-            # Upsert into database
-            inserted, updated = self._db.upsert_categories(category_list)
-            result.inserted = inserted
-            result.updated = updated
+            if not dry_run:
+                # Upsert into database
+                inserted, updated = self._db.upsert_categories(category_list)
+                result.inserted = inserted
+                result.updated = updated
 
-            # Update sync state and total
-            result.total = self._db.get_category_count()
-            self._db.update_sync_state("categories", datetime.now(), result.total)
+                # Update sync state and total
+                result.total = self._db.get_category_count()
+                self._db.update_sync_state("categories", datetime.now(), result.total)
+            else:
+                # Dry run - compare fetched with database to get accurate counts
+                for group in category_list.groups:
+                    for cat in group.categories:
+                        existing = self._db.get_category_by_id(cat.id)
+                        detail = CategoryDetail(name=cat.name, group_name=group.name)
+                        if existing:
+                            # Check if data would change
+                            if (
+                                existing["name"] != cat.name
+                                or existing["group_name"] != group.name
+                                or existing["hidden"] != cat.hidden
+                                or existing["deleted"] != cat.deleted
+                            ):
+                                result.updated += 1
+                                result.details_to_update.append(detail)
+                        else:
+                            result.inserted += 1
+                            result.details_to_insert.append(detail)
+                result.total = self._db.get_category_count()
 
         except Exception as e:
             result.errors.append(str(e))
@@ -346,11 +509,12 @@ class SyncService:
                                 splits=pending_splits,
                                 approve=True,
                             )
-                            # Verify: split transactions have category_name "Split" and approved
+                            # Verify: YNAB returns category_name="Split" and approved
+                            # (YNAB also assigns a budget-specific Split category_id)
                             verified = (
                                 updated_txn.category_name == "Split"
-                                or updated_txn.category_id is None
-                            ) and updated_txn.approved is True
+                                and updated_txn.approved is True
+                            )
                             if verified:
                                 # Clear pending splits after successful push
                                 self._db.clear_pending_splits(txn_id)
@@ -388,10 +552,28 @@ class SyncService:
                         if "approved" in new_values:
                             verified = verified and (updated_txn.approved == new_values["approved"])
 
+                        # Log push verification result for debugging
+                        logger.info(
+                            f"Push {txn_id}: sent category={new_values.get('category_id')}, "
+                            f"received category={updated_txn.category_id}, verified={verified}"
+                        )
+                        if not verified:
+                            logger.warning(
+                                f"Push verification FAILED for {txn_id}: "
+                                f"sent={new_values}, received category={updated_txn.category_id}, "
+                                f"approved={updated_txn.approved}"
+                            )
+
                     if verified:
-                        # Apply change to ynab_transactions and cleanup pending_changes
-                        self._db.apply_pending_change(txn_id)
+                        if change_type == "split":
+                            # Split already saved via upsert_ynab_transaction with YNAB's
+                            # category_id, just cleanup pending_changes
+                            self._db.delete_pending_change(txn_id)
+                        else:
+                            # Apply change to ynab_transactions and cleanup pending_changes
+                            self._db.apply_pending_change(txn_id)
                         result.succeeded += 1
+                        result.pushed_ids.append(txn_id)
                     else:
                         # YNAB returned different data than expected - keep in pending
                         result.failed += 1

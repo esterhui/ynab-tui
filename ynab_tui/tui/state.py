@@ -12,8 +12,7 @@ from ynab_tui.models import Transaction
 # Filter state labels matching app.py FILTER_LABELS
 FILTER_LABELS = {
     "all": "All",
-    "approved": "Approved",
-    "new": "New (Unapproved)",
+    "unapproved": "Unapproved",
     "uncategorized": "Uncategorized",
     "pending": "Pending Push",
 }
@@ -35,14 +34,14 @@ class FilterState:
     and testable without running the full TUI.
     """
 
-    mode: str = "all"  # all, approved, new, uncategorized, pending
+    mode: str = "all"  # all, unapproved, uncategorized, pending
     category: Optional[CategoryFilter] = None
     payee: Optional[str] = None
     is_submenu_active: bool = False
 
     def __post_init__(self) -> None:
         """Validate filter mode."""
-        valid_modes = {"all", "approved", "new", "uncategorized", "pending"}
+        valid_modes = {"all", "unapproved", "uncategorized", "pending"}
         if self.mode not in valid_modes:
             raise ValueError(f"Invalid filter mode: {self.mode}")
 
@@ -70,7 +69,7 @@ class FilterStateMachine:
 
         Args:
             state: Current filter state
-            mode: New mode to apply ("all", "approved", etc.)
+            mode: New mode to apply ("all", "unapproved", etc.)
 
         Returns:
             New FilterState with mode applied
@@ -228,97 +227,3 @@ class TagManager:
             List of transactions that are tagged
         """
         return [t for t in all_transactions if t.id in state.tagged_ids]
-
-
-class TransactionSelector:
-    """Pure transaction selection logic - testable without ListView.
-
-    Provides index-based selection without UI dependencies.
-    """
-
-    @staticmethod
-    def get_at_index(
-        transactions: list[Transaction],
-        index: Optional[int],
-    ) -> Optional[Transaction]:
-        """Get transaction at index.
-
-        Args:
-            transactions: List of transactions
-            index: Index to get (can be None)
-
-        Returns:
-            Transaction at index, or None if invalid index
-        """
-        if index is None or index < 0 or index >= len(transactions):
-            return None
-        return transactions[index]
-
-    @staticmethod
-    def find_index(
-        transactions: list[Transaction],
-        transaction_id: str,
-    ) -> Optional[int]:
-        """Find index of transaction by ID.
-
-        Args:
-            transactions: List of transactions
-            transaction_id: ID to find
-
-        Returns:
-            Index of transaction, or None if not found
-        """
-        for i, txn in enumerate(transactions):
-            if txn.id == transaction_id:
-                return i
-        return None
-
-    @staticmethod
-    def get_next_index(
-        current_index: Optional[int],
-        total_count: int,
-        wrap: bool = False,
-    ) -> Optional[int]:
-        """Get next valid index.
-
-        Args:
-            current_index: Current index (None means start at 0)
-            total_count: Total number of items
-            wrap: Whether to wrap around at end
-
-        Returns:
-            Next index, or None if at end and not wrapping
-        """
-        if total_count == 0:
-            return None
-        if current_index is None:
-            return 0
-        next_idx = current_index + 1
-        if next_idx >= total_count:
-            return 0 if wrap else None
-        return next_idx
-
-    @staticmethod
-    def get_prev_index(
-        current_index: Optional[int],
-        total_count: int,
-        wrap: bool = False,
-    ) -> Optional[int]:
-        """Get previous valid index.
-
-        Args:
-            current_index: Current index (None means start at end)
-            total_count: Total number of items
-            wrap: Whether to wrap around at start
-
-        Returns:
-            Previous index, or None if at start and not wrapping
-        """
-        if total_count == 0:
-            return None
-        if current_index is None:
-            return total_count - 1
-        prev_idx = current_index - 1
-        if prev_idx < 0:
-            return total_count - 1 if wrap else None
-        return prev_idx

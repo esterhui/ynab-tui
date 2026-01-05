@@ -35,7 +35,7 @@ class FuzzySelectItem(ListItem):
 class FuzzySelectModal(ModalScreen[Optional[T]], Generic[T]):
     """Reusable fzf-style fuzzy selection modal.
 
-    Opens as an overlay, type to filter, arrow keys to navigate, Enter to select.
+    Opens as an overlay, type to filter, j/k to navigate, Enter to select.
     Returns the selected item via result_fn, or None on cancel.
     """
 
@@ -134,7 +134,7 @@ class FuzzySelectModal(ModalScreen[Optional[T]], Generic[T]):
             yield Input(placeholder=self._placeholder, id="fuzzy-input")
             yield ListView(id="fuzzy-list")
             yield Static(
-                "↑↓ navigate • PgUp/PgDn scroll • Enter select • Esc cancel",
+                "j/k navigate • Enter select • Esc cancel",
                 id="fuzzy-footer",
             )
 
@@ -223,8 +223,8 @@ class FuzzySelectModal(ModalScreen[Optional[T]], Generic[T]):
                     event.prevent_default()
             return
 
-        # Handle navigation keys
-        if event.key in ("pageup", "pagedown", "up", "down"):
+        # Handle navigation keys (vim-style j/k and arrows)
+        if event.key in ("pageup", "pagedown", "up", "down", "j", "k"):
             current = list_view.index or 0
             max_index = len(list_view) - 1
             if max_index < 0:
@@ -234,9 +234,9 @@ class FuzzySelectModal(ModalScreen[Optional[T]], Generic[T]):
                 new_index = max(current - 10, 0)
             elif event.key == "pagedown":
                 new_index = min(current + 10, max_index)
-            elif event.key == "up":
+            elif event.key in ("up", "k"):
                 new_index = max(current - 1, 0)
-            elif event.key == "down":
+            elif event.key in ("down", "j"):
                 new_index = min(current + 1, max_index)
             list_view.index = new_index
             event.prevent_default()

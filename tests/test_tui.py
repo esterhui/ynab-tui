@@ -78,11 +78,10 @@ class TestTUIFilterNavigation:
 
             # Test each filter key (note: 'c' and 'p' open modals, not direct filters)
             filter_tests = [
-                ("a", "approved"),
-                ("n", "new"),
+                ("a", "unapproved"),
                 ("u", "uncategorized"),
                 ("e", "pending"),  # Changed from 'p' to 'e' for pending
-                ("x", "all"),
+                ("r", "all"),
             ]
 
             for key, expected_mode in filter_tests:
@@ -316,7 +315,7 @@ class TestTUIPushPreview:
             assert db.get_pending_change_count() == 1
 
     async def test_push_preview_confirm_and_push(self, tui_app_with_pending):
-        """Test 'y' pushes changes and closes screen."""
+        """Test 'enter' pushes changes and closes screen."""
         async with tui_app_with_pending.run_test() as pilot:
             await pilot.pause()
 
@@ -328,8 +327,8 @@ class TestTUIPushPreview:
             await pilot.press("p")
             await pilot.pause()
 
-            # Press 'y' to push directly
-            await pilot.press("y")
+            # Press enter to push
+            await pilot.press("enter")
             await pilot.pause()
 
             # Wait for all workers to complete (push worker + reload worker)
@@ -344,8 +343,8 @@ class TestTUIPushPreview:
             # Pending change should be cleared after successful push
             assert db.get_pending_change_count() == 0
 
-    async def test_push_preview_cancel_with_n(self, tui_app_with_pending):
-        """Test 'n' cancels push preview and closes screen."""
+    async def test_push_preview_cancel_with_escape(self, tui_app_with_pending):
+        """Test 'escape' cancels push preview and closes screen."""
         async with tui_app_with_pending.run_test() as pilot:
             await pilot.pause()
 
@@ -355,8 +354,8 @@ class TestTUIPushPreview:
             await pilot.press("p")
             await pilot.pause()
 
-            # Press 'n' to cancel (same as 'q')
-            await pilot.press("n")
+            # Press escape to cancel
+            await pilot.press("escape")
             await pilot.pause()
 
             # Should return to main screen
@@ -367,6 +366,124 @@ class TestTUIPushPreview:
 
             # Pending change should still exist
             assert db.get_pending_change_count() == 1
+
+
+class TestRefreshAfterPush:
+    """Test _refresh_after_push method for incremental UI updates."""
+
+    @pytest.fixture
+    def tui_app_with_transactions(self, tui_categorizer, tui_database):
+        """Create TUI app with test transactions in the database."""
+        # Create test transactions
+        for i in range(4):
+            txn = Transaction(
+                id=f"txn-test-{i}",
+                date=datetime(2025, 1, 15),
+                amount=-50.00 * (i + 1),
+                payee_name=f"Test Payee {i}",
+                payee_id=f"payee-{i}",
+                account_name="Checking",
+                account_id="acc-001",
+                approved=True,
+                category_id=f"cat-{i}",
+                category_name=f"Category {i}",
+                sync_status="pending_push" if i < 2 else "synced",
+            )
+            tui_database.upsert_ynab_transaction(txn)
+
+        # Use load_since_months=None to load all transactions regardless of date
+        return YNABCategorizerApp(categorizer=tui_categorizer, is_mock=True, load_since_months=None)
+
+    async def test_refresh_after_push_updates_listview_items(self, tui_app_with_transactions):
+        """Test that _refresh_after_push updates matching ListView items."""
+        from textual.widgets import ListView
+
+        from ynab_tui.tui.app import TransactionListItem
+
+        app = tui_app_with_transactions
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await app.workers.wait_for_complete()
+            # Additional pause to ensure UI has rendered after worker completes
+            await pilot.pause()
+
+            # Get ListView
+            txn_list = app.query_one("#transactions-list", ListView)
+            assert list(txn_list.children), "ListView should have transactions"
+
+            # Find a TransactionListItem and mark it as pending
+            txn_item = None
+            for child in txn_list.children:
+                if isinstance(child, TransactionListItem):
+                    txn_item = child
+                    break
+            assert txn_item is not None, "Should have TransactionListItem"
+            txn_item.txn.sync_status = "pending_push"
+            pushed_id = txn_item.txn.id
+
+            # Call _refresh_after_push
+            await app._refresh_after_push([pushed_id])
+
+            # Verify the item was updated
+            for child in txn_list.children:
+                if isinstance(child, TransactionListItem) and child.txn.id == pushed_id:
+                    assert child.txn.sync_status == "synced"
+                    break
+
+    async def test_refresh_after_push_preserves_selection(self, tui_app_with_transactions):
+        """Test that _refresh_after_push preserves current selection."""
+        app = tui_app_with_transactions
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await app.workers.wait_for_complete()
+
+            from textual.widgets import ListView
+
+            txn_list = app.query_one("#transactions-list", ListView)
+
+            # Navigate down 2 rows
+            await pilot.press("j")
+            await pilot.pause()
+            await pilot.press("j")
+            await pilot.pause()
+
+            original_index = txn_list.index
+
+            # Call _refresh_after_push with one of the transaction IDs
+            await app._refresh_after_push(["txn-test-0"])
+
+            # Selection should be preserved
+            assert txn_list.index == original_index
+
+    async def test_refresh_after_push_with_empty_list(self, tui_app_with_transactions):
+        """Test that _refresh_after_push handles empty pushed_ids gracefully."""
+        app = tui_app_with_transactions
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await app.workers.wait_for_complete()
+
+            original_count = len(app._transactions.transactions)
+
+            # Should not crash with empty list
+            await app._refresh_after_push([])
+
+            # State should be unchanged
+            assert len(app._transactions.transactions) == original_count
+
+    async def test_refresh_after_push_with_nonexistent_ids(self, tui_app_with_transactions):
+        """Test that _refresh_after_push handles IDs not in view."""
+        app = tui_app_with_transactions
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await app.workers.wait_for_complete()
+
+            original_count = len(app._transactions.transactions)
+
+            # Should not crash with IDs that don't exist
+            await app._refresh_after_push(["nonexistent-id-1", "nonexistent-id-2"])
+
+            # State should be unchanged
+            assert len(app._transactions.transactions) == original_count
 
 
 class TestTUISplitTransaction:
@@ -625,7 +742,7 @@ class TestTUISplitTransaction:
 
                 # Verify the transaction was updated
                 txn = tui_app_with_multi_item_amazon._test_amazon_txn
-                assert txn.category_name == "[Split 2]"
+                assert txn.category_name == "Split"
                 assert txn.is_split is True
                 assert txn.approved is True
                 assert txn.sync_status == "pending_push"
@@ -634,7 +751,7 @@ class TestTUISplitTransaction:
                 pending = tui_database.get_pending_change(txn.id)
                 assert pending is not None
                 assert pending["change_type"] == "split"
-                assert pending["new_category_name"] == "[Split 2]"
+                assert pending["new_category_name"] == "Split"
                 assert pending["new_approved"] == 1  # SQLite stores booleans as 0/1
 
                 # Verify splits were stored
@@ -707,7 +824,7 @@ class TestTUISplitTransaction:
 
                 # Verify split was saved
                 txn = tui_app_with_multi_item_amazon._test_amazon_txn
-                assert txn.category_name == "[Split 2]"
+                assert txn.category_name == "Split"
 
                 # Now reopen the split screen by pressing 'x' again
                 await pilot.press("x")
@@ -1330,8 +1447,8 @@ class TestTransactionListItemDisplay:
             sync_status="synced",
         )
         item = TransactionListItem(txn)
-        # Initial state should have -new class
-        assert "-new" in item.classes
+        # Initial state should have -unapproved class
+        assert "-unapproved" in item.classes
 
         # Change to pending_push
         txn.sync_status = "pending_push"
@@ -1957,11 +2074,11 @@ class TestPushChangeItemFormatRow:
             "payee_name": "Costco",
             "amount": -200.0,
             "change_type": "split",
-            "new_values": {"category_id": None, "category_name": "[Split 2]"},
+            "new_values": {"category_id": None, "category_name": "Split"},
             "original_values": {"category_id": None, "category_name": None},
-            "new_category_name": "[Split 2]",
+            "new_category_name": "Split",
             "original_category_name": None,
-            "category_name": "[Split 2]",
+            "category_name": "Split",
         }
         item = PushChangeItem(change)
         row = item._format_row()
@@ -2039,21 +2156,6 @@ class TestVersionAndFormatting:
         assert len(__version__) > 0
         # Should be semantic version format
         assert "." in __version__
-
-    def test_format_sync_time_none(self):
-        """Test _format_sync_time handles None."""
-        from ynab_tui.tui.app import _format_sync_time
-
-        result = _format_sync_time(None)
-        assert result == "Never"
-
-    def test_format_sync_time_with_datetime(self):
-        """Test _format_sync_time formats datetime."""
-        from ynab_tui.tui.app import _format_sync_time
-
-        result = _format_sync_time(datetime(2025, 1, 15, 10, 30))
-        assert "2025-01-15" in result
-        assert "10:30" in result
 
 
 # =============================================================================

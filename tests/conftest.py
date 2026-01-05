@@ -29,7 +29,7 @@ from ynab_tui.models import (
     SubTransaction,
     Transaction,
 )
-from ynab_tui.services.matching import TransactionInfo
+from ynab_tui.services.amazon_matcher import TransactionInfo
 
 # =============================================================================
 # Factory Functions (for use in tests that need to create many objects)

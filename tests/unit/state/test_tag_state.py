@@ -1,4 +1,4 @@
-"""Tests for TagState, TagManager, and TransactionSelector.
+"""Tests for TagState and TagManager.
 
 These tests verify the pure state/selection logic without Textual UI.
 """
@@ -8,7 +8,7 @@ from datetime import datetime
 import pytest
 
 from ynab_tui.models import Transaction
-from ynab_tui.tui.state import TagManager, TagState, TransactionSelector
+from ynab_tui.tui.state import TagManager, TagState
 
 
 def make_test_transaction(id: str = "txn-1") -> Transaction:
@@ -129,125 +129,3 @@ class TestTagManager:
         tagged = TagManager.get_tagged_transactions(state, txns)
 
         assert tagged == []
-
-
-class TestTransactionSelector:
-    """Tests for TransactionSelector operations."""
-
-    @pytest.fixture
-    def sample_transactions(self) -> list[Transaction]:
-        """Create sample transactions for testing."""
-        return [
-            make_test_transaction("t1"),
-            make_test_transaction("t2"),
-            make_test_transaction("t3"),
-        ]
-
-    def test_get_at_index_valid(self, sample_transactions: list[Transaction]) -> None:
-        """get_at_index should return transaction at index."""
-        txn = TransactionSelector.get_at_index(sample_transactions, 1)
-
-        assert txn is not None
-        assert txn.id == "t2"
-
-    def test_get_at_index_none(self, sample_transactions: list[Transaction]) -> None:
-        """get_at_index with None should return None."""
-        txn = TransactionSelector.get_at_index(sample_transactions, None)
-
-        assert txn is None
-
-    def test_get_at_index_negative(self, sample_transactions: list[Transaction]) -> None:
-        """get_at_index with negative should return None."""
-        txn = TransactionSelector.get_at_index(sample_transactions, -1)
-
-        assert txn is None
-
-    def test_get_at_index_out_of_bounds(self, sample_transactions: list[Transaction]) -> None:
-        """get_at_index beyond end should return None."""
-        txn = TransactionSelector.get_at_index(sample_transactions, 100)
-
-        assert txn is None
-
-    def test_get_at_index_empty_list(self) -> None:
-        """get_at_index on empty list should return None."""
-        txn = TransactionSelector.get_at_index([], 0)
-
-        assert txn is None
-
-    def test_find_index_found(self, sample_transactions: list[Transaction]) -> None:
-        """find_index should return index of matching ID."""
-        idx = TransactionSelector.find_index(sample_transactions, "t2")
-
-        assert idx == 1
-
-    def test_find_index_not_found(self, sample_transactions: list[Transaction]) -> None:
-        """find_index should return None if not found."""
-        idx = TransactionSelector.find_index(sample_transactions, "unknown")
-
-        assert idx is None
-
-    def test_find_index_empty_list(self) -> None:
-        """find_index on empty list should return None."""
-        idx = TransactionSelector.find_index([], "t1")
-
-        assert idx is None
-
-    def test_get_next_index_from_middle(self) -> None:
-        """get_next_index should return next index."""
-        idx = TransactionSelector.get_next_index(1, total_count=5)
-
-        assert idx == 2
-
-    def test_get_next_index_from_none(self) -> None:
-        """get_next_index from None should return 0."""
-        idx = TransactionSelector.get_next_index(None, total_count=5)
-
-        assert idx == 0
-
-    def test_get_next_index_at_end_no_wrap(self) -> None:
-        """get_next_index at end without wrap should return None."""
-        idx = TransactionSelector.get_next_index(4, total_count=5, wrap=False)
-
-        assert idx is None
-
-    def test_get_next_index_at_end_with_wrap(self) -> None:
-        """get_next_index at end with wrap should return 0."""
-        idx = TransactionSelector.get_next_index(4, total_count=5, wrap=True)
-
-        assert idx == 0
-
-    def test_get_next_index_empty(self) -> None:
-        """get_next_index on empty should return None."""
-        idx = TransactionSelector.get_next_index(0, total_count=0)
-
-        assert idx is None
-
-    def test_get_prev_index_from_middle(self) -> None:
-        """get_prev_index should return previous index."""
-        idx = TransactionSelector.get_prev_index(2, total_count=5)
-
-        assert idx == 1
-
-    def test_get_prev_index_from_none(self) -> None:
-        """get_prev_index from None should return last index."""
-        idx = TransactionSelector.get_prev_index(None, total_count=5)
-
-        assert idx == 4
-
-    def test_get_prev_index_at_start_no_wrap(self) -> None:
-        """get_prev_index at start without wrap should return None."""
-        idx = TransactionSelector.get_prev_index(0, total_count=5, wrap=False)
-
-        assert idx is None
-
-    def test_get_prev_index_at_start_with_wrap(self) -> None:
-        """get_prev_index at start with wrap should return last."""
-        idx = TransactionSelector.get_prev_index(0, total_count=5, wrap=True)
-
-        assert idx == 4
-
-    def test_get_prev_index_empty(self) -> None:
-        """get_prev_index on empty should return None."""
-        idx = TransactionSelector.get_prev_index(0, total_count=0)
-
-        assert idx is None

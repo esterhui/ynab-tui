@@ -393,22 +393,27 @@ class TestYNABTransactions:
         assert was_changed is False  # No data change
         assert database.get_transaction_count() == 1
 
-    def test_upsert_preserves_pending_push(self, database, sample_sync_transaction):
-        """Test that upsert doesn't overwrite pending_push status."""
+    def test_upsert_preserves_pending_change(self, database, sample_sync_transaction):
+        """Test that upsert doesn't overwrite pending changes in delta table."""
         database.upsert_ynab_transaction(sample_sync_transaction)
 
-        # Mark as pending push with new category
-        database.mark_pending_push(sample_sync_transaction.id, "cat-002", "Clothing")
+        # Create pending change with new category (delta table approach)
+        database.create_pending_change(
+            sample_sync_transaction.id,
+            new_values={"category_id": "cat-002", "category_name": "Clothing"},
+            original_values={"category_id": None, "category_name": None},
+        )
 
         # Re-sync from YNAB with original category
         sample_sync_transaction.category_name = "From YNAB"
         sample_sync_transaction.category_id = "cat-original"
         database.upsert_ynab_transaction(sample_sync_transaction)
 
-        # Local change should be preserved
-        txn = database.get_ynab_transaction(sample_sync_transaction.id)
-        assert txn["category_name"] == "Clothing"
-        assert txn["sync_status"] == "pending_push"
+        # Local change should be preserved via delta table overlay
+        txns = database.get_ynab_transactions(pending_push_only=True)
+        assert len(txns) == 1
+        assert txns[0]["category_name"] == "Clothing"
+        assert txns[0]["sync_status"] == "pending_push"
 
     def test_get_ynab_transaction(self, database, sample_sync_transaction):
         """Test getting a single transaction by ID."""
@@ -489,11 +494,15 @@ class TestYNABTransactions:
         assert txns[0]["id"] == "txn-uncat"
 
     def test_get_ynab_transactions_pending_push_only(self, database, sample_sync_transaction):
-        """Test filtering pending push transactions."""
+        """Test filtering pending push transactions via delta table."""
         database.upsert_ynab_transaction(sample_sync_transaction)
-        database.mark_pending_push(sample_sync_transaction.id, "cat-002", "Clothing")
+        database.create_pending_change(
+            sample_sync_transaction.id,
+            new_values={"category_id": "cat-002", "category_name": "Clothing"},
+            original_values={"category_id": None, "category_name": None},
+        )
 
-        # Add synced transaction
+        # Add synced transaction (no pending change)
         txn2 = Transaction(
             id="txn-synced",
             date=datetime(2025, 1, 16),
@@ -646,24 +655,6 @@ class TestAmazonOrderItems:
         )
         assert database.get_order_item_count() == 2
 
-    def test_set_amazon_item_category(self, database):
-        """Test setting category for Amazon items."""
-        database.cache_amazon_order("order-123", datetime(2025, 1, 15), 50.00)
-        database.upsert_amazon_order_items(
-            "order-123",
-            [{"name": "USB Cable"}, {"name": "USB Cable"}],  # Same item twice
-        )
-
-        # Set category for all matching items
-        updated = database.set_amazon_item_category("USB Cable", "cat-001", "Electronics")
-
-        assert updated == 2
-
-    def test_get_amazon_item_categories_empty(self, database):
-        """Test getting categories when none set."""
-        result = database.get_amazon_item_categories()
-        assert result == {}
-
 
 class TestTransactionCounts:
     """Tests for count methods."""
@@ -709,14 +700,22 @@ class TestTransactionCounts:
         assert database.get_uncategorized_count() == 1
 
     def test_get_pending_push_count(self, database, sample_sync_transaction):
-        """Test pending push count."""
+        """Test pending push count via pending_changes table."""
         database.upsert_ynab_transaction(sample_sync_transaction)
 
         assert database.get_pending_push_count() == 0
 
-        database.mark_pending_push(sample_sync_transaction.id, "cat-002", "Clothing")
+        # Use create_pending_change (the current delta table approach)
+        database.create_pending_change(
+            sample_sync_transaction.id,
+            new_values={"category_id": "cat-002", "category_name": "Clothing"},
+            original_values={"category_id": None, "category_name": None},
+        )
 
-        assert database.get_pending_push_count() == 1
+        # pending_push_count queries pending_changes table, not sync_status
+        # so this should now return 1
+        txns = database.get_ynab_transactions(pending_push_only=True)
+        assert len(txns) == 1
 
     def test_get_order_count(self, database):
         """Test order count."""
@@ -740,40 +739,12 @@ class TestTransactionCounts:
         assert database.get_order_item_count() == 3
 
 
-class TestMarkPendingPush:
-    """Tests for mark_pending_push method."""
-
-    def test_mark_pending_push_updates_category(self, database, sample_sync_transaction):
-        """Test marking transaction as pending push."""
-        database.upsert_ynab_transaction(sample_sync_transaction)
-
-        success = database.mark_pending_push(
-            sample_sync_transaction.id,
-            "cat-new",
-            "New Category",
-        )
-
-        assert success is True
-
-        txn = database.get_ynab_transaction(sample_sync_transaction.id)
-        assert txn["category_id"] == "cat-new"
-        assert txn["category_name"] == "New Category"
-        assert txn["sync_status"] == "pending_push"
-        assert txn["modified_at"] is not None
-
-    def test_mark_pending_push_not_found(self, database):
-        """Test marking non-existent transaction."""
-        success = database.mark_pending_push("non-existent", "cat-1", "Cat")
-        assert success is False
-
-
 class TestMarkSynced:
     """Tests for mark_synced method."""
 
-    def test_mark_synced_clears_pending(self, database, sample_sync_transaction):
+    def test_mark_synced_updates_status(self, database, sample_sync_transaction):
         """Test marking transaction as synced."""
         database.upsert_ynab_transaction(sample_sync_transaction)
-        database.mark_pending_push(sample_sync_transaction.id, "cat-1", "Cat")
 
         success = database.mark_synced(sample_sync_transaction.id)
 

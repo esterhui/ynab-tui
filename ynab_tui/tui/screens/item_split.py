@@ -5,11 +5,12 @@ from typing import Optional
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
-from textual.screen import Screen
+from textual.screen import ModalScreen
 from textual.widgets import Footer, Header, ListItem, ListView, Static
 
 from ...models import Transaction
 from ...services import CategorizerService
+from ...services.categorizer import SplitModificationError
 from ..constants import VIM_NAVIGATION_BINDINGS
 from ..modals import CategoryPickerModal, CategorySelection, TransactionSummary
 
@@ -49,7 +50,7 @@ class SplitItemListItem(ListItem):
 
         # Status indicator and category
         if self.assigned_category:
-            status = "[*]"
+            status = "[✓]"
             cat_name = self.assigned_category.get("category_name", "")[:20]
             cat_str = f"[green]{cat_name}[/green]"
         else:
@@ -64,8 +65,8 @@ class SplitItemListItem(ListItem):
         self.query_one(Static).update(self._format_row())
 
 
-class ItemSplitScreen(Screen[bool]):
-    """Screen for splitting Amazon transactions by item.
+class ItemSplitScreen(ModalScreen[bool]):
+    """Modal screen for splitting Amazon transactions by item.
 
     Shows a ListView of order items, navigate with j/k, press 'c' to
     categorize each using CategoryPickerModal.
@@ -117,8 +118,8 @@ class ItemSplitScreen(Screen[bool]):
         Binding("down", "cursor_down", "Down", show=False),
         Binding("up", "cursor_up", "Up", show=False),
         Binding("c", "categorize_item", "Categorize"),
-        Binding("enter", "submit_or_categorize", "Select/Submit", show=False),
-        Binding("s", "submit_split", "Submit"),
+        Binding("enter", "categorize_or_advance", "Select", show=False),
+        Binding("a", "apply_split", "Apply"),
         Binding("escape", "cancel", "Cancel"),
         Binding("q", "cancel", "Cancel", show=False),
     ]
@@ -149,6 +150,9 @@ class ItemSplitScreen(Screen[bool]):
 
         # Track assignments: {index: {category_id, category_name}}
         self._assignments: dict[int, dict] = {}
+
+        # Store original splits for change detection
+        self._original_splits = existing_splits or []
 
         # Pre-populate assignments from existing pending splits
         if existing_splits:
@@ -266,8 +270,21 @@ class ItemSplitScreen(Screen[bool]):
         if list_view.index is not None and list_view.index > 0:
             list_view.index -= 1
 
+    def _is_pushed_split(self) -> bool:
+        """Check if this split was already pushed to YNAB (has subtransactions in DB)."""
+        return bool(self._categorizer._db.get_subtransactions(self._transaction.id))
+
     def action_categorize_item(self) -> None:
         """Open category picker for the current item."""
+        # Block modification of already-pushed splits (YNAB API limitation)
+        if self._is_pushed_split():
+            self.notify(
+                "Cannot modify pushed splits - edit in YNAB app",
+                severity="error",
+                timeout=8,
+            )
+            return
+
         item = self._get_current_item()
         if not item:
             return
@@ -342,29 +359,46 @@ class ItemSplitScreen(Screen[bool]):
 
         # All categorized - stay on current
 
-    def action_submit_or_categorize(self) -> None:
-        """Enter key: categorize if uncategorized, submit if all done."""
-        idx = self._get_current_item_index()
+    def _splits_unchanged(self) -> bool:
+        """Check if current assignments match original splits."""
+        if not self._original_splits:
+            return False  # No original = always changed
 
-        # If current item uncategorized, categorize it
-        if idx is not None and idx not in self._assignments:
-            self.action_categorize_item()
-            return
+        # Build current splits for comparison
+        current = self._calculate_splits_with_remainder()
 
-        # If all items categorized, submit
-        if len(self._assignments) == len(self._items):
-            self.action_submit_split()
-        else:
-            # Move to next uncategorized
-            self._advance_to_next_uncategorized()
-            self.notify(f"{len(self._items) - len(self._assignments)} items still need categories")
+        # Compare by category_id and memo (item matching)
+        if len(current) != len(self._original_splits):
+            return False
 
-    def action_submit_split(self) -> None:
-        """Submit the split transaction."""
+        # Create lookup from original splits
+        orig_by_memo = {s.get("memo", ""): s.get("category_id") for s in self._original_splits}
+
+        for split in current:
+            memo = split.get("memo", "")
+            if memo not in orig_by_memo:
+                return False
+            if orig_by_memo[memo] != split.get("category_id"):
+                return False
+
+        return True
+
+    def action_categorize_or_advance(self) -> None:
+        """Enter key: open categorizer for current item (same as 'c')."""
+        self.action_categorize_item()
+
+    def action_apply_split(self) -> None:
+        """Apply the split categorizations locally."""
         # Validate all items are categorized
         if len(self._assignments) != len(self._items):
             uncategorized = len(self._items) - len(self._assignments)
             self.notify(f"{uncategorized} items still need categories", severity="warning")
+            return
+
+        # Check if splits actually changed - no-op if unchanged
+        if self._splits_unchanged():
+            self.notify("No changes to apply")
+            self.dismiss(True)  # Exit without modifying
             return
 
         # Calculate splits with distributed remainder
@@ -376,9 +410,15 @@ class ItemSplitScreen(Screen[bool]):
                 transaction=self._transaction,
                 splits=splits,
             )
-            self.notify(f"✓ Split into {len(splits)} categories!")
+            self.notify(f"✓ Applied {len(splits)} category splits")
             self.dismiss(True)  # Signal success to callback
 
+        except SplitModificationError:
+            self.notify(
+                "Cannot modify pushed splits - edit in YNAB app",
+                severity="error",
+                timeout=8,
+            )
         except Exception as e:
             self.notify(f"Error: {e}", severity="error")
 

@@ -314,6 +314,85 @@ class TestPullYnab:
         assert result.oldest_date == datetime(2025, 11, 1)
         assert result.newest_date == datetime(2025, 11, 30)
 
+    def test_pull_ynab_fix_creates_pending_changes_for_conflicts(
+        self, temp_db: Database, mock_ynab: MockYNABClient, mock_amazon: MockAmazonClient
+    ) -> None:
+        """pull_ynab with fix=True creates pending_changes for conflicts."""
+        # First, insert a categorized transaction
+        original_txn = make_transaction(
+            "txn-conflict",
+            date=datetime(2025, 11, 15),
+            category_id="cat-groceries",
+            category_name="Groceries",
+        )
+        temp_db.upsert_ynab_transaction(original_txn)
+
+        # Now mock YNAB returning it uncategorized (simulating bank re-import)
+        mock_ynab.transactions = [
+            make_transaction(
+                "txn-conflict",
+                date=datetime(2025, 11, 15),
+                category_id=None,
+                category_name=None,
+            ),
+        ]
+
+        service = SyncService(temp_db, mock_ynab, mock_amazon)
+        result = service.pull_ynab(full=True, fix=True)
+
+        assert result.success is True
+        assert result.conflicts_found == 1
+        assert result.conflicts_fixed == 1
+
+        # Verify the transaction is marked for push
+        stored = temp_db.get_ynab_transaction("txn-conflict")
+        assert stored["sync_status"] == "pending_push"
+        assert stored["category_id"] == "cat-groceries"  # Preserved
+
+        # Verify pending_change was created
+        pending = temp_db.get_pending_change("txn-conflict")
+        assert pending is not None
+        assert pending["new_values"]["category_id"] == "cat-groceries"
+
+    def test_pull_ynab_without_fix_does_not_create_pending_changes(
+        self, temp_db: Database, mock_ynab: MockYNABClient, mock_amazon: MockAmazonClient
+    ) -> None:
+        """pull_ynab without fix=True only detects conflicts, doesn't fix them."""
+        # First, insert a categorized transaction
+        original_txn = make_transaction(
+            "txn-conflict",
+            date=datetime(2025, 11, 15),
+            category_id="cat-groceries",
+            category_name="Groceries",
+        )
+        temp_db.upsert_ynab_transaction(original_txn)
+
+        # Now mock YNAB returning it uncategorized
+        mock_ynab.transactions = [
+            make_transaction(
+                "txn-conflict",
+                date=datetime(2025, 11, 15),
+                category_id=None,
+                category_name=None,
+            ),
+        ]
+
+        service = SyncService(temp_db, mock_ynab, mock_amazon)
+        result = service.pull_ynab(full=True, fix=False)
+
+        assert result.success is True
+        assert result.conflicts_found == 1
+        assert result.conflicts_fixed == 0  # Not fixed
+
+        # Verify the transaction is still marked as conflict
+        stored = temp_db.get_ynab_transaction("txn-conflict")
+        assert stored["sync_status"] == "conflict"
+        assert stored["category_id"] == "cat-groceries"  # Preserved
+
+        # Verify no pending_change was created
+        pending = temp_db.get_pending_change("txn-conflict")
+        assert pending is None
+
 
 class TestPullAmazonIncremental:
     """Tests for incremental pull_amazon."""
@@ -561,7 +640,7 @@ class TestPushYnab:
         # Create pending split
         temp_db.create_pending_change(
             "txn-001",
-            {"category_name": "[Split 2]", "approved": True},
+            {"category_name": "Split", "approved": True},
             {"category_id": None},
             "split",
         )
@@ -617,6 +696,50 @@ class TestPushYnab:
         assert result.succeeded == 3
         assert len(progress_calls) == 3
         assert progress_calls[-1] == (3, 3)
+
+    def test_pushed_ids_populated(
+        self, temp_db: Database, mock_ynab: MockYNABClient, mock_amazon: MockAmazonClient
+    ) -> None:
+        """Verifies pushed_ids contains successfully pushed transaction IDs."""
+        # Add transactions with pending changes
+        for i in range(3):
+            txn = make_transaction(id=f"txn-{i}")
+            mock_ynab.transactions.append(txn)
+            temp_db.upsert_ynab_transaction(txn)
+            temp_db.create_pending_change(
+                f"txn-{i}",
+                {"category_id": "cat-1", "approved": True},
+                {"category_id": None},
+                "update",
+            )
+
+        service = SyncService(temp_db, mock_ynab, mock_amazon)
+        result = service.push_ynab()
+
+        assert result.succeeded == 3
+        assert len(result.pushed_ids) == 3
+        assert set(result.pushed_ids) == {"txn-0", "txn-1", "txn-2"}
+
+    def test_pushed_ids_empty_when_dry_run(
+        self, temp_db: Database, mock_ynab: MockYNABClient, mock_amazon: MockAmazonClient
+    ) -> None:
+        """Verifies pushed_ids is empty on dry run."""
+        txn = make_transaction()
+        mock_ynab.transactions = [txn]
+        temp_db.upsert_ynab_transaction(txn)
+        temp_db.create_pending_change(
+            "txn-001",
+            {"category_id": "cat-1", "approved": True},
+            {"category_id": None},
+            "update",
+        )
+
+        service = SyncService(temp_db, mock_ynab, mock_amazon)
+        result = service.push_ynab(dry_run=True)
+
+        assert result.pushed == 1
+        assert result.succeeded == 0
+        assert len(result.pushed_ids) == 0
 
 
 class TestBuildPushSummary:
