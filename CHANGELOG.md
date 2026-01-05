@@ -5,6 +5,37 @@ All notable changes to YNAB TUI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-01-04
+
+### Added
+- **Conflict detection**: Preserve local category when YNAB returns "Uncategorized" after push; shows "!" flag in TUI with `pull --fix` to resolve
+- `pull --dry-run` flag with detailed insert/update/conflict preview
+- `pull --since-days` support for YNAB pull (previously Amazon-only)
+- Dedicated help screen (`?` to open/close)
+- Pending and conflict counts in status bar
+- Push verification logging for debugging sync issues
+
+### Changed
+- Simplify push preview: Enter/y pushes, q/n/Esc cancels (removed intermediate step)
+- Escape key now context-aware: clears filters first, then quits
+- Rename "new" filter to "unapproved" (keybinding `n` -> `a`)
+- Rename flags: `--ynab-only`/`--amazon-only` -> `--ynab`/`--amazon`
+- Split transactions display "Split" consistently (matching YNAB)
+- Condense TUI: compact status bar, reduce footer shortcuts to essentials
+- Flatten DB mixins and merge matching/ directory (code consolidation)
+
+### Fixed
+- Pull no longer overwrites locally categorized transactions
+- PageUp/PageDown/Home/End now move cursor (not just viewport)
+- Push screen no longer flickers after successful push
+- Split transactions show correct category in push preview
+- Filter reset key changed from `x` to `r` (was conflicting with Split)
+
+### Removed
+- Dead code cleanup: protocol files, unused services, ~1,200 lines removed
+- "approved" filter (rarely used)
+
+
 ## [0.1.1] - 2025-12-21
 
 ### Changed
