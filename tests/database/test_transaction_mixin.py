@@ -539,3 +539,99 @@ class TestConflictDetection:
         stored = temp_db.get_ynab_transaction("txn-conflict")
         assert stored["category_id"] == "cat-travel"
         assert stored["sync_status"] == "synced"  # Conflict resolved
+
+    def test_get_conflict_transactions_returns_conflicts(self, temp_db: Database) -> None:
+        """get_conflict_transactions returns all transactions with sync_status='conflict'."""
+        # Create a conflict
+        txn = make_transaction(
+            id="txn-conflict-1",
+            category_id="cat-groceries",
+            category_name="Groceries",
+        )
+        temp_db.upsert_ynab_transaction(txn)
+
+        # YNAB uncategorizes it (creates conflict)
+        ynab_txn = make_transaction(
+            id="txn-conflict-1",
+            category_id=None,
+            category_name=None,
+        )
+        temp_db.upsert_ynab_transaction(ynab_txn)
+
+        # Create a non-conflict transaction
+        normal_txn = make_transaction(
+            id="txn-normal",
+            category_id="cat-travel",
+            category_name="Travel",
+        )
+        temp_db.upsert_ynab_transaction(normal_txn)
+
+        # Get conflicts
+        conflicts = temp_db.get_conflict_transactions()
+        assert len(conflicts) == 1
+        assert conflicts[0]["id"] == "txn-conflict-1"
+        assert conflicts[0]["category_name"] == "Groceries"
+
+    def test_fix_conflict_transaction_creates_pending_change(self, temp_db: Database) -> None:
+        """fix_conflict_transaction creates pending_change and updates sync_status."""
+        # Create a conflict
+        txn = make_transaction(
+            id="txn-fix",
+            category_id="cat-groceries",
+            category_name="Groceries",
+        )
+        temp_db.upsert_ynab_transaction(txn)
+
+        # YNAB uncategorizes it (creates conflict)
+        ynab_txn = make_transaction(
+            id="txn-fix",
+            category_id=None,
+            category_name=None,
+        )
+        temp_db.upsert_ynab_transaction(ynab_txn)
+
+        # Verify it's a conflict
+        stored = temp_db.get_ynab_transaction("txn-fix")
+        assert stored["sync_status"] == "conflict"
+
+        # Fix the conflict
+        result = temp_db.fix_conflict_transaction("txn-fix")
+        assert result is True
+
+        # Verify sync_status changed to pending_push
+        stored = temp_db.get_ynab_transaction("txn-fix")
+        assert stored["sync_status"] == "pending_push"
+
+        # Verify pending_change was created
+        pending = temp_db.get_pending_change("txn-fix")
+        assert pending is not None
+        assert pending["new_values"]["category_id"] == "cat-groceries"
+        assert pending["new_values"]["category_name"] == "Groceries"
+        assert pending["original_values"]["category_id"] is None
+
+    def test_fix_conflict_transaction_returns_false_for_non_conflict(
+        self, temp_db: Database
+    ) -> None:
+        """fix_conflict_transaction returns False for non-conflict transactions."""
+        # Create a normal synced transaction
+        txn = make_transaction(
+            id="txn-normal",
+            category_id="cat-groceries",
+            category_name="Groceries",
+        )
+        temp_db.upsert_ynab_transaction(txn)
+
+        # Try to fix it (should fail)
+        result = temp_db.fix_conflict_transaction("txn-normal")
+        assert result is False
+
+        # Verify nothing changed
+        stored = temp_db.get_ynab_transaction("txn-normal")
+        assert stored["sync_status"] == "synced"
+
+    def test_fix_conflict_transaction_returns_false_for_nonexistent(
+        self, temp_db: Database
+    ) -> None:
+        """fix_conflict_transaction returns False for non-existent transaction."""
+        result = temp_db.fix_conflict_transaction("nonexistent-id")
+        assert result is False

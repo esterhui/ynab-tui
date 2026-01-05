@@ -314,6 +314,85 @@ class TestPullYnab:
         assert result.oldest_date == datetime(2025, 11, 1)
         assert result.newest_date == datetime(2025, 11, 30)
 
+    def test_pull_ynab_fix_creates_pending_changes_for_conflicts(
+        self, temp_db: Database, mock_ynab: MockYNABClient, mock_amazon: MockAmazonClient
+    ) -> None:
+        """pull_ynab with fix=True creates pending_changes for conflicts."""
+        # First, insert a categorized transaction
+        original_txn = make_transaction(
+            "txn-conflict",
+            date=datetime(2025, 11, 15),
+            category_id="cat-groceries",
+            category_name="Groceries",
+        )
+        temp_db.upsert_ynab_transaction(original_txn)
+
+        # Now mock YNAB returning it uncategorized (simulating bank re-import)
+        mock_ynab.transactions = [
+            make_transaction(
+                "txn-conflict",
+                date=datetime(2025, 11, 15),
+                category_id=None,
+                category_name=None,
+            ),
+        ]
+
+        service = SyncService(temp_db, mock_ynab, mock_amazon)
+        result = service.pull_ynab(full=True, fix=True)
+
+        assert result.success is True
+        assert result.conflicts_found == 1
+        assert result.conflicts_fixed == 1
+
+        # Verify the transaction is marked for push
+        stored = temp_db.get_ynab_transaction("txn-conflict")
+        assert stored["sync_status"] == "pending_push"
+        assert stored["category_id"] == "cat-groceries"  # Preserved
+
+        # Verify pending_change was created
+        pending = temp_db.get_pending_change("txn-conflict")
+        assert pending is not None
+        assert pending["new_values"]["category_id"] == "cat-groceries"
+
+    def test_pull_ynab_without_fix_does_not_create_pending_changes(
+        self, temp_db: Database, mock_ynab: MockYNABClient, mock_amazon: MockAmazonClient
+    ) -> None:
+        """pull_ynab without fix=True only detects conflicts, doesn't fix them."""
+        # First, insert a categorized transaction
+        original_txn = make_transaction(
+            "txn-conflict",
+            date=datetime(2025, 11, 15),
+            category_id="cat-groceries",
+            category_name="Groceries",
+        )
+        temp_db.upsert_ynab_transaction(original_txn)
+
+        # Now mock YNAB returning it uncategorized
+        mock_ynab.transactions = [
+            make_transaction(
+                "txn-conflict",
+                date=datetime(2025, 11, 15),
+                category_id=None,
+                category_name=None,
+            ),
+        ]
+
+        service = SyncService(temp_db, mock_ynab, mock_amazon)
+        result = service.pull_ynab(full=True, fix=False)
+
+        assert result.success is True
+        assert result.conflicts_found == 1
+        assert result.conflicts_fixed == 0  # Not fixed
+
+        # Verify the transaction is still marked as conflict
+        stored = temp_db.get_ynab_transaction("txn-conflict")
+        assert stored["sync_status"] == "conflict"
+        assert stored["category_id"] == "cat-groceries"  # Preserved
+
+        # Verify no pending_change was created
+        pending = temp_db.get_pending_change("txn-conflict")
+        assert pending is None
+
 
 class TestPullAmazonIncremental:
     """Tests for incremental pull_amazon."""

@@ -701,6 +701,63 @@ class Database:
             ).fetchone()
             return dict(row) if row else None
 
+    def get_conflict_transactions(self) -> list[dict[str, Any]]:
+        """Get all transactions with sync_status='conflict'."""
+        with self._connection() as conn:
+            rows = conn.execute(
+                """SELECT id, date, amount, payee_name, payee_id, category_id, category_name,
+                account_name, account_id, memo, cleared, approved, is_split, sync_status
+                FROM ynab_transactions WHERE sync_status = 'conflict'
+                ORDER BY date DESC"""
+            ).fetchall()
+            return [dict(row) for row in rows]
+
+    def fix_conflict_transaction(self, transaction_id: str) -> bool:
+        """Mark a conflict transaction as pending_push to re-sync local category to YNAB.
+
+        Creates a pending_change entry with the local category and marks the
+        transaction as pending_push so the next push will update YNAB.
+
+        Returns:
+            True if the conflict was fixed, False if transaction not found or not a conflict.
+        """
+        with self._connection() as conn:
+            # Get the conflict transaction
+            txn = conn.execute(
+                """SELECT id, category_id, category_name, approved
+                FROM ynab_transactions WHERE id = ? AND sync_status = 'conflict'""",
+                (transaction_id,),
+            ).fetchone()
+
+            if not txn:
+                return False
+
+            # Create pending change to push local category back to YNAB
+            new_values = {
+                "category_id": txn["category_id"],
+                "category_name": txn["category_name"],
+            }
+            # Original values: uncategorized (what YNAB sent)
+            original_values = {
+                "category_id": None,
+                "category_name": None,
+            }
+
+            # Update sync status to pending_push
+            conn.execute(
+                "UPDATE ynab_transactions SET sync_status = 'pending_push', modified_at = ? WHERE id = ?",
+                (_now_iso(), transaction_id),
+            )
+
+            # Create or update pending change
+            self.create_pending_change(transaction_id, new_values, original_values, "update")
+
+            logger.info(
+                f"Fixed conflict for {transaction_id}: will push category "
+                f"'{txn['category_name']}' to YNAB on next push"
+            )
+            return True
+
     # =========================================================================
     # Amazon Methods
     # =========================================================================

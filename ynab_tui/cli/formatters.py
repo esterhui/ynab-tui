@@ -358,11 +358,12 @@ def display_dry_run_categories(result: PullResult) -> None:
             click.echo(f"  {name:<30} {group:<25}")
 
 
-def display_dry_run_transactions(result: PullResult) -> None:
+def display_dry_run_transactions(result: PullResult, fix: bool = False) -> None:
     """Display dry-run transaction details.
 
     Args:
         result: PullResult with details_to_insert and details_to_update populated.
+        fix: If True, show conflicts as "F FIXED" (would be marked for push).
     """
     if not result.details_to_insert and not result.details_to_update:
         return
@@ -391,17 +392,31 @@ def display_dry_run_transactions(result: PullResult) -> None:
                 click.echo(f"  {date_str:<12} {payee:<30} ${txn.amount:>10,.2f}")
 
         if conflicts:
-            click.echo(click.style("\n  ! CONFLICTS (local category preserved):", fg="red"))
-            click.echo(f"  {'Date':<12} {'Payee':<25} {'Amount':>10}  {'Category'}")
-            click.echo("  " + "-" * 65)
-            for txn in conflicts:
-                date_str = txn.date.strftime("%Y-%m-%d")
-                payee = (txn.payee_name or "")[:25]
-                cat_info = f"{txn.local_category}→Uncat" if txn.local_category else ""
-                click.echo(
-                    click.style("! ", fg="red")
-                    + f"{date_str:<12} {payee:<25} ${txn.amount:>9,.2f}  {cat_info}"
-                )
+            if fix:
+                # Show as "F FIXED" when --fix is used
+                click.echo(click.style("\n  F FIXED (would be marked for push):", fg="yellow"))
+                click.echo(f"  {'Date':<12} {'Payee':<25} {'Amount':>10}  {'Category'}")
+                click.echo("  " + "-" * 65)
+                for txn in conflicts:
+                    date_str = txn.date.strftime("%Y-%m-%d")
+                    payee = (txn.payee_name or "")[:25]
+                    click.echo(
+                        click.style("F ", fg="yellow")
+                        + f"{date_str:<12} {payee:<25} ${txn.amount:>9,.2f}  {txn.local_category}"
+                    )
+            else:
+                # Show as "! CONFLICTS" when --fix is not used
+                click.echo(click.style("\n  ! CONFLICTS (local category preserved):", fg="red"))
+                click.echo(f"  {'Date':<12} {'Payee':<25} {'Amount':>10}  {'Category'}")
+                click.echo("  " + "-" * 65)
+                for txn in conflicts:
+                    date_str = txn.date.strftime("%Y-%m-%d")
+                    payee = (txn.payee_name or "")[:25]
+                    cat_info = f"{txn.local_category}→Uncat" if txn.local_category else ""
+                    click.echo(
+                        click.style("! ", fg="red")
+                        + f"{date_str:<12} {payee:<25} ${txn.amount:>9,.2f}  {cat_info}"
+                    )
 
 
 def display_dry_run_amazon(result: PullResult) -> None:

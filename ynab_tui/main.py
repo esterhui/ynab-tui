@@ -727,8 +727,13 @@ def amazon_match(ctx, verbose):
     help="Only fetch orders/transactions from the last N days (ignores sync state)",
 )
 @click.option("--dry-run", is_flag=True, help="Show what would be pulled without making changes")
+@click.option(
+    "--fix",
+    is_flag=True,
+    help="Fix conflicts by marking local categories for push to YNAB",
+)
 @click.pass_context
-def pull(ctx, full, ynab, amazon, amazon_year, since_days, dry_run):
+def pull(ctx, full, ynab, amazon, amazon_year, since_days, dry_run, fix):
     """Pull data from YNAB and Amazon to local database.
 
     Downloads categories, transactions and orders to local SQLite for offline
@@ -804,7 +809,7 @@ def pull(ctx, full, ynab, amazon, amazon_year, since_days, dry_run):
         else:
             click.echo("  First sync - fetching all transactions")
 
-        result = sync_service.pull_ynab(full=full, since_days=since_days, dry_run=dry_run)
+        result = sync_service.pull_ynab(full=full, since_days=since_days, dry_run=dry_run, fix=fix)
         results["ynab"] = result
 
         if result.success:
@@ -815,8 +820,47 @@ def pull(ctx, full, ynab, amazon, amazon_year, since_days, dry_run):
                 )
             click.echo(f"    Inserted: {result.inserted}, Updated: {result.updated}")
             click.echo(f"    Total in database: {result.total}")
+            # Show conflict info
+            if result.conflicts_found > 0:
+                if result.conflicts_fixed > 0:
+                    # Non-dry-run with --fix: conflicts were actually fixed
+                    click.echo(
+                        click.style(
+                            f"    Fixed: {result.conflicts_fixed} conflict(s) marked for push",
+                            fg="yellow",
+                        )
+                    )
+                    # Show details of fixed conflicts
+                    click.echo(click.style("\n  F FIXED (will push on next 'push'):", fg="yellow"))
+                    click.echo(f"  {'Date':<12} {'Payee':<25} {'Amount':>10}  {'Category'}")
+                    click.echo("  " + "-" * 65)
+                    for txn in result.fixed_conflicts:
+                        date_str = txn["date"][:10] if txn.get("date") else ""
+                        payee = (txn.get("payee_name") or "")[:25]
+                        amount = txn.get("amount", 0)
+                        category = txn.get("category_name") or ""
+                        click.echo(
+                            click.style("F ", fg="yellow")
+                            + f"{date_str:<12} {payee:<25} ${amount:>9,.2f}  {category}"
+                        )
+                elif dry_run and fix:
+                    # Dry-run with --fix: would fix conflicts
+                    click.echo(
+                        click.style(
+                            f"    Would fix: {result.conflicts_found} conflict(s)",
+                            fg="yellow",
+                        )
+                    )
+                else:
+                    # No --fix: show conflicts with hint
+                    click.echo(
+                        click.style(
+                            f"    Conflicts: {result.conflicts_found} (use --fix to mark for push)",
+                            fg="red",
+                        )
+                    )
             if dry_run:
-                display_dry_run_transactions(result)
+                display_dry_run_transactions(result, fix=fix)
         else:
             click.echo(click.style(f"  ✗ Error: {result.errors}", fg="red"))
 
@@ -876,6 +920,22 @@ def pull(ctx, full, ynab, amazon, amazon_year, since_days, dry_run):
                 click.echo(click.style(f"  ✗ Error: {result.errors}", fg="red"))
 
     click.echo("\nPull complete!")
+
+    # Show hint if there are unfixed conflicts (only when --fix was not used)
+    ynab_result = results.get("ynab")
+    if (
+        ynab_result
+        and ynab_result.conflicts_found > 0
+        and ynab_result.conflicts_fixed == 0
+        and not fix
+    ):
+        click.echo(
+            click.style(
+                f"\nHint: {ynab_result.conflicts_found} conflict(s) detected. "
+                "Run 'pull --fix' to mark local categories for push to YNAB.",
+                fg="cyan",
+            )
+        )
 
 
 @main.command("push")

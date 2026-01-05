@@ -116,6 +116,7 @@ ynab-tui init              # Create config file at ~/.config/ynab-tui/config.tom
 # Sync commands (git-style pull/push)
 ynab-tui pull              # Pull YNAB + Amazon data to local DB
 ynab-tui pull --full       # Full pull of all data
+ynab-tui pull --fix        # Fix conflicts by marking for push to YNAB
 ynab-tui push              # Push local categorizations to YNAB
 ynab-tui push --dry-run    # Preview what would be pushed
 
@@ -220,6 +221,27 @@ If YNAB resets a categorized transaction to "Uncategorized" (e.g., due to bank r
 - **Warning logged** with transaction ID and preserved category
 
 This protects your categorization work from being lost when banks re-import transactions.
+
+**Resolving conflicts with `--fix`:**
+
+When conflicts are detected, you can use `pull --fix` to mark them for push back to YNAB:
+
+```bash
+# See what conflicts exist
+ynab-tui pull --dry-run
+# Output: ! CONFLICTS (local category preserved):
+# ! 2025-12-21   Trader Joe's   $-177.28  Groceries→Uncat
+
+# Fix conflicts (mark local categories for push)
+ynab-tui pull --fix
+# Output: F FIXED (will push on next 'push'):
+# F 2025-12-21   Trader Joe's   $-177.28  Groceries
+
+# Push the fixed categories back to YNAB
+ynab-tui push
+```
+
+The `--fix` flag creates pending changes that will restore your local categories to YNAB on the next push.
 
 ### Typical Workflow
 

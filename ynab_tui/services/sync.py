@@ -67,6 +67,10 @@ class PullResult:
     # Detailed items for dry-run display
     details_to_insert: list[Any] = field(default_factory=list)
     details_to_update: list[Any] = field(default_factory=list)
+    # Conflict tracking
+    conflicts_found: int = 0  # Number of conflicts detected
+    conflicts_fixed: int = 0  # Number of conflicts marked for push (--fix)
+    fixed_conflicts: list[dict] = field(default_factory=list)  # Details of fixed conflicts
 
     @property
     def success(self) -> bool:
@@ -148,7 +152,11 @@ class SyncService:
         return orders
 
     def pull_ynab(
-        self, full: bool = False, since_days: Optional[int] = None, dry_run: bool = False
+        self,
+        full: bool = False,
+        since_days: Optional[int] = None,
+        dry_run: bool = False,
+        fix: bool = False,
     ) -> PullResult:
         """Pull YNAB transactions to local database.
 
@@ -156,6 +164,7 @@ class SyncService:
             full: If True, pull all transactions. If False, incremental from last sync.
             since_days: If provided, fetch transactions from the last N days (ignores sync state).
             dry_run: If True, fetch but don't write to database.
+            fix: If True, mark conflicts as pending_push so next push will update YNAB.
 
         Returns:
             PullResult with statistics.
@@ -193,6 +202,15 @@ class SyncService:
                         pbar.update(len(transactions))
                     result.inserted = inserted
                     result.updated = updated
+
+                    # Check for conflicts and optionally fix them
+                    conflicts = self._db.get_conflict_transactions()
+                    result.conflicts_found = len(conflicts)
+                    if fix and conflicts:
+                        for conflict in conflicts:
+                            if self._db.fix_conflict_transaction(conflict["id"]):
+                                result.conflicts_fixed += 1
+                                result.fixed_conflicts.append(conflict)
                 else:
                     # Dry run - compare fetched with database to get accurate counts
                     for txn in transactions:
@@ -215,16 +233,29 @@ class SyncService:
                         if existing:
                             # Check if data would change (simplified comparison)
                             new_date = txn.date.strftime("%Y-%m-%d")
+                            # Skip category_id comparison for split transactions
+                            # (Split pseudo-category ID varies, but category_name="Split" is consistent)
+                            is_split_match = (
+                                existing["is_split"]
+                                and txn.is_split
+                                and existing["category_name"] == "Split"
+                                and txn.category_name == "Split"
+                            )
+                            category_changed = (
+                                not is_split_match and existing["category_id"] != txn.category_id
+                            )
                             if (
                                 existing["date"][:10] != new_date
                                 or existing["amount"] != txn.amount
                                 or existing["payee_name"] != txn.payee_name
-                                or existing["category_id"] != txn.category_id
+                                or category_changed
                                 or existing["memo"] != txn.memo
                                 or existing["approved"] != txn.approved
                             ):
                                 result.updated += 1
                                 result.details_to_update.append(detail)
+                            if is_conflict:
+                                result.conflicts_found += 1
                         else:
                             result.inserted += 1
                             result.details_to_insert.append(detail)
