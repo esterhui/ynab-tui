@@ -408,11 +408,15 @@ def generate_transactions(
         transfer_account_name: str = "",
         debt_transaction_type: str = "",
         is_split: bool = False,
-    ) -> None:
+        parent_transaction_id: str = "",
+        txn_id: str | None = None,
+    ) -> str:
+        """Add a transaction and return its ID."""
         cat = categories.get(category_name) if category_name else None
+        tid = txn_id or generate_uuid()
         rows.append(
             {
-                "id": generate_uuid(),
+                "id": tid,
                 "budget_id": BUDGET_ID,
                 "date": date.strftime("%Y-%m-%d"),
                 "amount": amount,
@@ -427,9 +431,14 @@ def generate_transactions(
                 "transfer_account_name": transfer_account_name,
                 "debt_transaction_type": debt_transaction_type,
                 "is_split": "1" if is_split else "0",
-                "parent_transaction_id": "",
+                "parent_transaction_id": parent_transaction_id,
             }
         )
+        return tid
+
+    # Reserve some multi-item orders for synced splits (indices 0-2)
+    # and pending splits (indices 3-4)
+    reserved_for_splits = {0, 1, 2, 3, 4}
 
     # 1. Amazon transactions that match orders (uncategorized for TUI workflow)
     print("Generating Amazon transactions...")
@@ -438,6 +447,9 @@ def generate_transactions(
         if order.total <= 0:
             continue
         if i in used_orders:
+            continue
+        # Skip orders reserved for split transactions
+        if i in reserved_for_splits and len(order.items) >= 2:
             continue
 
         # Create matching transaction 1-7 days after order (Stage 1 matching)
@@ -470,6 +482,106 @@ def generate_transactions(
 
         if amazon_txn_count >= 35:
             break
+
+    # 1b. Synced Amazon split transactions (already pushed to YNAB)
+    # These have parent transaction with is_split=1, category_name="Split"
+    # and subtransactions with parent_transaction_id pointing to parent
+    # Uses reserved orders 0, 1, 2
+    print("Generating synced Amazon split transactions...")
+    split_count = 0
+
+    # Map item categories to YNAB categories
+    item_category_map = {
+        "Electronics": "Electronics",
+        "Home": "Home Goods",
+        "Baby": "Baby & Kids",
+        "Personal Care": "Healthcare",
+        "Pet": "General Shopping",
+        "Office": "General Shopping",
+    }
+
+    for i in [0, 1, 2]:  # Use reserved orders for synced splits
+        if i >= len(amazon_orders):
+            continue
+        order = amazon_orders[i]
+        if order.total <= 0 or len(order.items) < 2:
+            continue
+
+        # Create matching transaction 1-5 days after order
+        days_after = random.randint(1, 5)
+        txn_date = order.order_date + timedelta(days=days_after)
+        if txn_date > END_DATE:
+            txn_date = END_DATE
+
+        payee = random.choice(AMAZON_PAYEES)
+
+        # Create parent split transaction
+        parent_id = add_transaction(
+            date=txn_date,
+            amount=-order.total,
+            payee=payee,
+            category_name="Split",  # YNAB uses "Split" for split transactions
+            is_split=True,
+            approved=True,
+        )
+
+        for item_name, item_price in order.items:
+            # Determine category from item
+            item_category = "General Shopping"
+            for prod_cat, products in AMAZON_PRODUCTS.items():
+                if any(item_name == p[0] for p in products):
+                    item_category = item_category_map.get(prod_cat, "General Shopping")
+                    break
+
+            add_transaction(
+                date=txn_date,
+                amount=-item_price,
+                payee=payee,
+                category_name=item_category,
+                parent_transaction_id=parent_id,
+                memo=item_name,  # Item name in memo for display
+                approved=True,
+            )
+
+        used_orders.add(i)
+        split_count += 1
+
+    print(f"  Created {split_count} synced split transactions")
+
+    # 1c. Uncategorized Amazon transactions for pending splits testing
+    # These will be picked up by generate_pending_splits() to create pending splits
+    # Uses reserved orders 3, 4
+    print("Generating uncategorized Amazon transactions for pending splits...")
+    pending_split_ready_count = 0
+    for i in [3, 4]:  # Use reserved orders for pending splits
+        if i >= len(amazon_orders):
+            continue
+        order = amazon_orders[i]
+        if order.total <= 0 or len(order.items) < 2:
+            continue
+
+        # Create matching uncategorized transaction
+        days_after = random.randint(1, 5)
+        txn_date = order.order_date + timedelta(days=days_after)
+        if txn_date > END_DATE:
+            txn_date = END_DATE
+
+        payee = random.choice(AMAZON_PAYEES)
+
+        add_transaction(
+            date=txn_date,
+            amount=-order.total,
+            payee=payee,
+            category_name=None,  # Uncategorized - will be used for pending splits
+            approved=False,
+        )
+
+        used_orders.add(i)
+        pending_split_ready_count += 1
+
+    print(
+        f"  Created {pending_split_ready_count} uncategorized Amazon transactions for pending splits"
+    )
 
     # 2. Regular categorized transactions (recurring payees)
     print("Generating regular transactions...")
@@ -646,16 +758,176 @@ def generate_transactions(
     unapproved = sum(1 for r in rows if r["approved"] == "0")
     transfers = sum(1 for r in rows if r["transfer_account_id"])
     amazon = sum(1 for r in rows if "Amazon" in r["payee_name"] or "AMZN" in r["payee_name"])
+    splits = sum(1 for r in rows if r["is_split"] == "1")
+    subtransactions = sum(1 for r in rows if r["parent_transaction_id"])
 
     print(f"Generated {len(rows)} transactions:")
     print(f"  - {uncategorized} uncategorized")
     print(f"  - {unapproved} unapproved")
     print(f"  - {transfers} transfers")
     print(f"  - {amazon} Amazon")
+    print(f"  - {splits} split parents with {subtransactions} subtransactions")
+
+
+def generate_pending_splits(categories: dict[str, CategoryInfo]) -> None:
+    """Generate pending Amazon split transactions in the mock database.
+
+    This creates pending_changes and pending_splits entries for
+    uncategorized Amazon transactions that match multi-item orders.
+    Must be run AFTER the mock database has been populated with a pull.
+    """
+    from pathlib import Path
+
+    # Import database after defining - avoid circular imports
+    try:
+        from ynab_tui.db.database import Database
+    except ImportError:
+        print(
+            "Warning: Could not import Database. Run 'uv run python -m ynab_tui.main --mock pull' first."
+        )
+        return
+
+    # Mock database path
+    db_path = Path.home() / ".config" / "ynab-tui" / "mock_categorizer.db"
+    if not db_path.exists():
+        print(f"Warning: Mock database not found at {db_path}")
+        print(
+            "Run 'uv run python -m ynab_tui.main --mock pull --ynab --full' first to create the database."
+        )
+        return
+
+    db = Database(str(db_path))
+
+    # Find uncategorized Amazon transactions with multi-item orders
+    # We'll create pending splits for these
+    txns = db.get_ynab_transactions(uncategorized_only=True)
+    amazon_txns = [
+        t
+        for t in txns
+        if any(p in t.get("payee_name", "") for p in ["Amazon", "AMZN"]) and t.get("is_split") != 1
+    ]
+
+    if not amazon_txns:
+        print("No uncategorized Amazon transactions found for pending splits.")
+        return
+
+    # Load orders to find matching multi-item orders
+    orders_csv = OUTPUT_DIR / "orders.csv"
+    if not orders_csv.exists():
+        print("Warning: orders.csv not found. Generate orders first.")
+        return
+
+    import csv as csv_mod
+
+    orders = []
+    with open(orders_csv, "r") as f:
+        reader = csv_mod.DictReader(f)
+        for row in reader:
+            if row["items"] and " ||| " in row["items"]:
+                items = []
+                for item_str in row["items"].split(" ||| "):
+                    parts = item_str.rsplit("|", 1)
+                    if len(parts) == 2:
+                        items.append((parts[0], float(parts[1])))
+                if len(items) >= 2:
+                    orders.append(
+                        {
+                            "order_id": row["order_id"],
+                            "order_date": row["order_date"],
+                            "total": float(row["total"]),
+                            "items": items,
+                        }
+                    )
+
+    # Match transactions to orders by amount (within tolerance)
+    pending_count = 0
+    for txn in amazon_txns[:2]:  # Create 2 pending splits
+        txn_amount = abs(txn["amount"])  # Amount is already in dollars
+
+        for order in orders:
+            if abs(order["total"] - txn_amount) < 0.10:  # Within 10 cents
+                # Found a match! Create pending split
+                items = order["items"]
+
+                # Map items to categories
+                item_category_map = {
+                    "Electronics": "Electronics",
+                    "Home": "Home Goods",
+                    "Baby": "Baby & Kids",
+                    "Personal Care": "Healthcare",
+                    "Pet": "General Shopping",
+                    "Office": "General Shopping",
+                }
+
+                splits = []
+                for item_name, item_price in items:
+                    # Find category for this item
+                    cat_name = "General Shopping"
+                    for prod_cat, products in AMAZON_PRODUCTS.items():
+                        if any(item_name == p[0] for p in products):
+                            cat_name = item_category_map.get(prod_cat, "General Shopping")
+                            break
+
+                    cat = categories.get(cat_name)
+                    splits.append(
+                        {
+                            "category_id": cat.id if cat else None,
+                            "category_name": cat_name,
+                            "amount": -item_price,  # Amount in dollars
+                            "memo": item_name,
+                        }
+                    )
+
+                # Create pending change
+                db.create_pending_change(
+                    transaction_id=txn["id"],
+                    new_values={
+                        "category_id": None,
+                        "category_name": "Split",
+                        "approved": True,
+                    },
+                    original_values={
+                        "category_id": txn.get("category_id"),
+                        "category_name": txn.get("category_name"),
+                        "approved": txn.get("approved"),
+                    },
+                    change_type="split",
+                )
+
+                # Create pending splits
+                db.mark_pending_split(
+                    transaction_id=txn["id"],
+                    splits=splits,
+                    category_name="Split",
+                )
+
+                pending_count += 1
+                print(
+                    f"  Created pending split for {txn['payee_name']} ${txn_amount:.2f} ({len(items)} items)"
+                )
+                orders.remove(order)  # Don't reuse this order
+                break
+
+    print(f"Generated {pending_count} pending Amazon split transactions")
 
 
 def main():
     """Generate all mock data files."""
+    import sys
+
+    # Check for --pending-splits flag
+    if "--pending-splits" in sys.argv:
+        print("=" * 60)
+        print("Generating pending Amazon split transactions")
+        print("=" * 60)
+        print()
+        # Load categories for pending splits
+        categories = generate_categories()
+        print()
+        generate_pending_splits(categories)
+        print("=" * 60)
+        return
+
     print("=" * 60)
     print("Generating synthetic mock data for YNAB TUI")
     print("=" * 60)
@@ -671,10 +943,14 @@ def main():
     print()
 
     print("=" * 60)
-    print("Done! Files written to:")
+    print("Done! CSV files written to:")
     print(f"  - {OUTPUT_DIR / 'categories.csv'}")
     print(f"  - {OUTPUT_DIR / 'orders.csv'}")
     print(f"  - {OUTPUT_DIR / 'transactions.csv'}")
+    print()
+    print("To generate pending splits in the mock database:")
+    print("  1. Run: uv run python -m ynab_tui.main --mock pull --ynab --full")
+    print("  2. Run: uv run python -m ynab_tui.mock_data.generate_mock_data --pending-splits")
     print("=" * 60)
 
 

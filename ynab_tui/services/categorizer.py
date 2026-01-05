@@ -30,6 +30,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class SplitModificationError(Exception):
+    """Raised when attempting to modify an already-pushed split transaction.
+
+    YNAB API limitation: Cannot update subtransactions on existing split transactions.
+    Users must modify splits directly in the YNAB app.
+    """
+
+    pass
+
+
 class CategorizerService:
     """Main service for transaction categorization."""
 
@@ -271,8 +281,7 @@ class CategorizerService:
         filter_map = {
             "uncategorized": TransactionFilter.uncategorized(),
             "pending": TransactionFilter.pending(),
-            "approved": TransactionFilter.approved(),
-            "new": TransactionFilter.unapproved(),
+            "unapproved": TransactionFilter.unapproved(),
         }
         txn_filter = filter_map.get(filter_mode, TransactionFilter())
 
@@ -366,14 +375,26 @@ class CategorizerService:
 
         Returns:
             Updated transaction marked as split and pending_push.
+
+        Raises:
+            SplitModificationError: If transaction is already a pushed split.
+                YNAB API doesn't support modifying existing split subtransactions.
         """
+        # Check if this is an already-pushed split (has subtransactions in DB)
+        existing_subtxns = self._db.get_subtransactions(transaction.id)
+        if existing_subtxns:
+            raise SplitModificationError(
+                "Cannot modify split categories after push to YNAB. "
+                "YNAB API limitation: modify splits directly in YNAB app."
+            )
+
         # Get original values (preserves first originals if already pending)
         originals = self._get_original_values(
             transaction, ["category_id", "category_name", "approved"]
         )
 
-        # Build display name showing split count
-        split_category_name = f"[Split {len(splits)}]"
+        # Use "Split" to match YNAB's category name for split transactions
+        split_category_name = "Split"
 
         # Create pending change record with split type
         self._db.create_pending_change(
@@ -391,6 +412,7 @@ class CategorizerService:
         self._db.mark_pending_split(
             transaction_id=transaction.id,
             splits=splits,
+            category_name=split_category_name,
         )
 
         # Record each categorization in history for learning

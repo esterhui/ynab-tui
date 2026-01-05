@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any
 
 from ynab_tui.db.database import AmazonOrderCache
-from ynab_tui.services.matching import TransactionInfo
+from ynab_tui.services.amazon_matcher import TransactionInfo
 
 
 def make_transaction_info(

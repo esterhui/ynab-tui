@@ -402,7 +402,7 @@ class TestApplySplitCategories:
 
         assert result.is_split is True
         assert result.sync_status == "pending_push"
-        assert "[Split 2]" in result.category_name
+        assert result.category_name == "Split"
 
         # Verify splits are stored
         pending_splits = temp_db.get_pending_splits("txn-001")
@@ -647,13 +647,9 @@ class TestGetTransactions:
         config = make_config()
         categorizer = CategorizerService(config, mock_ynab, temp_db)
 
-        approved = categorizer.get_transactions(filter_mode="approved")
-        assert len(approved.transactions) == 1
-        assert approved.transactions[0].id == "txn-1"
-
-        new = categorizer.get_transactions(filter_mode="new")
-        assert len(new.transactions) == 1
-        assert new.transactions[0].id == "txn-2"
+        unapproved = categorizer.get_transactions(filter_mode="unapproved")
+        assert len(unapproved.transactions) == 1
+        assert unapproved.transactions[0].id == "txn-2"
 
 
 class TestGetPendingTransactions:

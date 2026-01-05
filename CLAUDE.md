@@ -141,6 +141,18 @@ Vim-style navigation in `ynab_tui/tui/app.py`:
 
 **Historical Learning**: Categorization decisions are recorded for pattern-based suggestions.
 
+**Conflict Detection**: Pull detects when YNAB returns "Uncategorized" but local DB has a category:
+- Preserves local category (doesn't overwrite)
+- Sets `sync_status='conflict'` in `ynab_transactions`
+- Logs warning: `Conflict detected for {txn_id}: keeping local category '{name}'`
+- TUI shows "!" flag for conflict transactions
+- Code: `database.py:upsert_ynab_transaction()` lines 340-361
+
+**Push Verification Logging**: Push logs verification results for debugging:
+- Logs: `Push {txn_id}: sent category={id}, received category={id}, verified={bool}`
+- Warns on failure: `Push verification FAILED for {txn_id}: sent={values}, received...`
+- Code: `sync.py:push_ynab()` lines 502-512
+
 **Testing**: Use `--mock` flag for offline testing. Mock clients load from `ynab_tui/mock_data/*.csv`. Tests use `pytest-asyncio` for TUI testing and fixtures in `tests/conftest.py`.
 
 ## Dev Notes
@@ -148,6 +160,16 @@ Vim-style navigation in `ynab_tui/tui/app.py`:
 - Never use `git add -A`, always add specific files
 - YNAB amounts are in **milliunits** (divide by 1000 for dollars)
 - The database uses WAL mode for concurrent access
+- **Logging**: Uses Python `logging` module with logger name `ynab_tui.*`. By default WARNING+ goes to stderr.
+  ```python
+  # Enable INFO logs to see push verification details:
+  import logging
+  logging.basicConfig(level=logging.INFO, format='%(name)s - %(levelname)s - %(message)s')
+
+  # Key loggers:
+  # - ynab_tui.db.database: Conflict detection warnings
+  # - ynab_tui.services.sync: Push verification logs
+  ```
 - Check GitHub security/code-scanning before pushing:
   ```bash
   # Check for open alerts

@@ -11,7 +11,7 @@ help:
 	@echo "  make sloc       - Count lines of code (requires scc)"
 	@echo "  make check      - Run all checks (format, lint, typecheck)"
 	@echo "  make format     - Format code only"
-	@echo "  make mock-data  - Generate synthetic mock CSV data (deterministic)"
+	@echo "  make mock-data  - Generate mock data (CSV + DB + pending splits)"
 	@echo "  make mock-prod-data - Export production DB to mock CSV files"
 	@echo "  make clean      - Remove cache files"
 	@echo ""
@@ -68,7 +68,19 @@ format:
 
 mock-data:
 	@echo "Generating synthetic mock data..."
-	uv run python ynab_tui/mock_data/generate_mock_data.py
+	@echo "Step 1: Generate CSV files..."
+	uv run python -m ynab_tui.mock_data.generate_mock_data
+	@echo ""
+	@echo "Step 2: Clear mock database..."
+	uv run python -m ynab_tui.main --mock db-clear --yes
+	@echo ""
+	@echo "Step 3: Pull mock data into database..."
+	uv run python -m ynab_tui.main --mock pull --full
+	@echo ""
+	@echo "Step 4: Generate pending splits..."
+	uv run python -m ynab_tui.mock_data.generate_mock_data --pending-splits
+	@echo ""
+	@echo "Mock data generation complete!"
 
 mock-prod-data:
 	@echo "Exporting production database to mock CSV files..."

@@ -26,8 +26,7 @@ HELP_TEXT = """\
   T         Clear all tags
 
 [b]Filter (f + key):[/b]
-  a         Approved
-  n         New (unapproved)
+  a         Unapproved
   u         Uncategorized
   e         Pending push
   c         By category

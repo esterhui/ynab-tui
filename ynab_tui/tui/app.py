@@ -69,7 +69,7 @@ class TransactionListItem(ListItem):
         if txn.sync_status == "pending_push":
             self.add_class("-pending")
         elif not txn.approved:
-            self.add_class("-new")
+            self.add_class("-unapproved")
 
     def compose(self) -> ComposeResult:
         """Compose the list item content."""
@@ -78,11 +78,11 @@ class TransactionListItem(ListItem):
     def update_content(self) -> None:
         """Update the displayed content after transaction changes."""
         # Update CSS classes based on current state
-        self.remove_class("-new", "-pending")
+        self.remove_class("-unapproved", "-pending")
         if self.txn.sync_status == "pending_push":
             self.add_class("-pending")
         elif not self.txn.approved:
-            self.add_class("-new")
+            self.add_class("-unapproved")
 
         # Update text content
         try:
@@ -228,13 +228,13 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         background: $primary;
     }
 
-    /* New/unapproved transactions - different text color */
-    TransactionListItem.-new {
+    /* Unapproved transactions - different text color */
+    TransactionListItem.-unapproved {
         color: #88aacc;
     }
 
     /* When highlighted, use light cyan to distinguish from normal rows */
-    TransactionListItem.-new.-highlight {
+    TransactionListItem.-unapproved.-highlight {
         color: #ccddee;
     }
 
@@ -293,18 +293,16 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
     ]
 
     # Filter modes and their labels
-    FILTER_MODES = ["all", "approved", "new", "uncategorized", "pending"]
+    FILTER_MODES = ["all", "unapproved", "uncategorized", "pending"]
     FILTER_LABELS = {
         "all": "All",
-        "approved": "Approved",
-        "new": "New (Unapproved)",
+        "unapproved": "Unapproved",
         "uncategorized": "Uncategorized",
         "pending": "Pending Push",
     }
     # Key mappings for filter submenu
     FILTER_KEYS = {
-        "a": "approved",
-        "n": "new",
+        "a": "unapproved",
         "u": "uncategorized",
         "e": "pending",
         "r": "all",  # Reset to all
@@ -380,12 +378,18 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             total = self._transactions.total_count
             uncategorized = sum(1 for t in self._transactions.transactions if t.is_uncategorized)
             unapproved = sum(1 for t in self._transactions.transactions if t.is_unapproved)
+            pending = sum(1 for t in self._transactions.transactions if t.needs_push)
+            conflicts = sum(1 for t in self._transactions.transactions if t.has_conflict)
 
             counts = [str(total)]
             if uncategorized:
                 counts.append(f"{uncategorized} uncat")
             if unapproved:
-                counts.append(f"{unapproved} new")
+                counts.append(f"[cyan]{unapproved} unapproved[/cyan]")
+            if pending:
+                counts.append(f"[green]{pending} pending[/green]")
+            if conflicts:
+                counts.append(f"[red]{conflicts} ![/red]")
             parts.append(" / ".join(counts))
 
         return " │ ".join(parts)
@@ -630,8 +634,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
         self._filter_state = FilterStateMachine.enter_submenu(self._filter_state)
         filter_text = (
             "[yellow]Filter:[/yellow] "
-            "[cyan]a[/cyan]pproved "
-            "[cyan]n[/cyan]ew "
+            "un[cyan]a[/cyan]pproved "
             "[cyan]u[/cyan]ncat "
             "p[cyan]e[/cyan]nding "
             "[cyan]c[/cyan]ategory "

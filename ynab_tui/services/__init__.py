@@ -3,7 +3,6 @@
 from .amazon_matcher import AmazonMatchResult, AmazonOrderMatcher, TransactionInfo
 from .categorizer import CategorizerService
 from .category_mapping import CategoryMappingService, LearningResult
-from .history import HistoryService, PayeePattern
 from .matcher import TransactionMatcher
 
 __all__ = [
@@ -14,6 +13,4 @@ __all__ = [
     "LearningResult",
     "TransactionInfo",
     "TransactionMatcher",
-    "HistoryService",
-    "PayeePattern",
 ]

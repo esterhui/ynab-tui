@@ -9,7 +9,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from ynab_tui.services.matching import (
+from ynab_tui.services.amazon_matcher import (
     calculate_date_range,
     find_best_order_match,
     find_combo_matches,

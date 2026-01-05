@@ -12,8 +12,7 @@ from ynab_tui.models import Transaction
 # Filter state labels matching app.py FILTER_LABELS
 FILTER_LABELS = {
     "all": "All",
-    "approved": "Approved",
-    "new": "New (Unapproved)",
+    "unapproved": "Unapproved",
     "uncategorized": "Uncategorized",
     "pending": "Pending Push",
 }
@@ -35,14 +34,14 @@ class FilterState:
     and testable without running the full TUI.
     """
 
-    mode: str = "all"  # all, approved, new, uncategorized, pending
+    mode: str = "all"  # all, unapproved, uncategorized, pending
     category: Optional[CategoryFilter] = None
     payee: Optional[str] = None
     is_submenu_active: bool = False
 
     def __post_init__(self) -> None:
         """Validate filter mode."""
-        valid_modes = {"all", "approved", "new", "uncategorized", "pending"}
+        valid_modes = {"all", "unapproved", "uncategorized", "pending"}
         if self.mode not in valid_modes:
             raise ValueError(f"Invalid filter mode: {self.mode}")
 
@@ -70,7 +69,7 @@ class FilterStateMachine:
 
         Args:
             state: Current filter state
-            mode: New mode to apply ("all", "approved", etc.)
+            mode: New mode to apply ("all", "unapproved", etc.)
 
         Returns:
             New FilterState with mode applied
