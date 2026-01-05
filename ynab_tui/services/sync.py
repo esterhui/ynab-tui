@@ -509,11 +509,12 @@ class SyncService:
                                 splits=pending_splits,
                                 approve=True,
                             )
-                            # Verify: split transactions have category_name "Split" and approved
+                            # Verify: YNAB returns category_name="Split" and approved
+                            # (YNAB also assigns a budget-specific Split category_id)
                             verified = (
                                 updated_txn.category_name == "Split"
-                                or updated_txn.category_id is None
-                            ) and updated_txn.approved is True
+                                and updated_txn.approved is True
+                            )
                             if verified:
                                 # Clear pending splits after successful push
                                 self._db.clear_pending_splits(txn_id)
@@ -564,8 +565,13 @@ class SyncService:
                             )
 
                     if verified:
-                        # Apply change to ynab_transactions and cleanup pending_changes
-                        self._db.apply_pending_change(txn_id)
+                        if change_type == "split":
+                            # Split already saved via upsert_ynab_transaction with YNAB's
+                            # category_id, just cleanup pending_changes
+                            self._db.delete_pending_change(txn_id)
+                        else:
+                            # Apply change to ynab_transactions and cleanup pending_changes
+                            self._db.apply_pending_change(txn_id)
                         result.succeeded += 1
                         result.pushed_ids.append(txn_id)
                     else:

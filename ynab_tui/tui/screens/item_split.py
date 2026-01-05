@@ -10,6 +10,7 @@ from textual.widgets import Footer, Header, ListItem, ListView, Static
 
 from ...models import Transaction
 from ...services import CategorizerService
+from ...services.categorizer import SplitModificationError
 from ..constants import VIM_NAVIGATION_BINDINGS
 from ..modals import CategoryPickerModal, CategorySelection, TransactionSummary
 
@@ -269,8 +270,21 @@ class ItemSplitScreen(ModalScreen[bool]):
         if list_view.index is not None and list_view.index > 0:
             list_view.index -= 1
 
+    def _is_pushed_split(self) -> bool:
+        """Check if this split was already pushed to YNAB (has subtransactions in DB)."""
+        return bool(self._categorizer._db.get_subtransactions(self._transaction.id))
+
     def action_categorize_item(self) -> None:
         """Open category picker for the current item."""
+        # Block modification of already-pushed splits (YNAB API limitation)
+        if self._is_pushed_split():
+            self.notify(
+                "Cannot modify pushed splits - edit in YNAB app",
+                severity="error",
+                timeout=8,
+            )
+            return
+
         item = self._get_current_item()
         if not item:
             return
@@ -399,6 +413,12 @@ class ItemSplitScreen(ModalScreen[bool]):
             self.notify(f"✓ Applied {len(splits)} category splits")
             self.dismiss(True)  # Signal success to callback
 
+        except SplitModificationError:
+            self.notify(
+                "Cannot modify pushed splits - edit in YNAB app",
+                severity="error",
+                timeout=8,
+            )
         except Exception as e:
             self.notify(f"Error: {e}", severity="error")
 

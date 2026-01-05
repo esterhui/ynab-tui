@@ -385,7 +385,7 @@ class MockYNABClient:
                     memo=txn.memo,
                     account_name=txn.account_name,
                     account_id=txn.account_id,
-                    category_id=None,  # Split transactions have no parent category
+                    category_id="mock-split-category-id",  # YNAB assigns a Split category ID
                     category_name="Split",
                     approved=approve,
                     cleared=txn.cleared,

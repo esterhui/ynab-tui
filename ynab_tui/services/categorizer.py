@@ -30,6 +30,16 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class SplitModificationError(Exception):
+    """Raised when attempting to modify an already-pushed split transaction.
+
+    YNAB API limitation: Cannot update subtransactions on existing split transactions.
+    Users must modify splits directly in the YNAB app.
+    """
+
+    pass
+
+
 class CategorizerService:
     """Main service for transaction categorization."""
 
@@ -365,7 +375,19 @@ class CategorizerService:
 
         Returns:
             Updated transaction marked as split and pending_push.
+
+        Raises:
+            SplitModificationError: If transaction is already a pushed split.
+                YNAB API doesn't support modifying existing split subtransactions.
         """
+        # Check if this is an already-pushed split (has subtransactions in DB)
+        existing_subtxns = self._db.get_subtransactions(transaction.id)
+        if existing_subtxns:
+            raise SplitModificationError(
+                "Cannot modify split categories after push to YNAB. "
+                "YNAB API limitation: modify splits directly in YNAB app."
+            )
+
         # Get original values (preserves first originals if already pending)
         originals = self._get_original_values(
             transaction, ["category_id", "category_name", "approved"]
