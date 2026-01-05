@@ -380,12 +380,18 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             total = self._transactions.total_count
             uncategorized = sum(1 for t in self._transactions.transactions if t.is_uncategorized)
             unapproved = sum(1 for t in self._transactions.transactions if t.is_unapproved)
+            pending = sum(1 for t in self._transactions.transactions if t.needs_push)
+            conflicts = sum(1 for t in self._transactions.transactions if t.has_conflict)
 
             counts = [str(total)]
             if uncategorized:
                 counts.append(f"{uncategorized} uncat")
             if unapproved:
-                counts.append(f"{unapproved} new")
+                counts.append(f"[cyan]{unapproved} new[/cyan]")
+            if pending:
+                counts.append(f"[green]{pending} pending[/green]")
+            if conflicts:
+                counts.append(f"[red]{conflicts} ![/red]")
             parts.append(" / ".join(counts))
 
         return " │ ".join(parts)
