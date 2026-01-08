@@ -114,13 +114,29 @@ def find_combo_matches(
     window_days: int,
     amount_tolerance: float,
 ) -> list[tuple[AmazonOrderCache, tuple[TransactionInfo, ...]]]:
-    """Find combinations of transactions that sum to an order total."""
+    """Find combinations of transactions that sum to an order total.
+
+    Each transaction can only be used in one combo match. Once a transaction
+    is part of a combo, it's excluded from future combo searches.
+
+    Orders are processed in ascending date order (oldest first) to prioritize
+    matching older orders before newer ones can "steal" their transactions.
+    """
     combo_matches: list[tuple[AmazonOrderCache, tuple[TransactionInfo, ...]]] = []
     if not unmatched_txns or not unmatched_orders:
         return combo_matches
-    for order in unmatched_orders:
+
+    # Track transactions already used in a combo
+    used_txn_ids: set[str] = set()
+
+    # Process orders oldest first to prioritize older matches
+    sorted_orders = sorted(unmatched_orders, key=lambda o: o.order_date)
+
+    for order in sorted_orders:
+        # Filter out already-used transactions before finding nearby ones
+        available_txns = [t for t in unmatched_txns if t.transaction_id not in used_txn_ids]
         nearby_txns = [
-            t for t in unmatched_txns if abs((t.date - order.order_date).days) <= window_days
+            t for t in available_txns if abs((t.date - order.order_date).days) <= window_days
         ]
         if len(nearby_txns) < 2:
             continue
@@ -131,6 +147,9 @@ def find_combo_matches(
             for txn_combo in combinations(nearby_txns, combo_size):
                 if abs(sum(t.amount for t in txn_combo) - order.total) <= amount_tolerance:
                     combo_matches.append((order, txn_combo))
+                    # Mark these transactions as used
+                    for t in txn_combo:
+                        used_txn_ids.add(t.transaction_id)
                     found_combo = True
                     break
     return combo_matches

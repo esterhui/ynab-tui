@@ -318,6 +318,55 @@ class TestFindComboMatches:
         # Combo matching requires 2+ transactions
         assert result == []
 
+    def test_transaction_not_reused_across_combos(self) -> None:
+        """A transaction used in one combo should not be used in another.
+
+        Real-world bug scenario:
+        - Combo 1: $36.08 + $46.79 = $82.87 (matches toilet supplies order, Jan 3)
+        - Combo 2: $36.08 + $24.05 + $11.87 = $72.00 ≈ $71.99 (should NOT match)
+
+        The $36.08 transaction should only be used in the first combo.
+        Without this fix, $11.87 incorrectly shows items from the mattress topper order.
+
+        IMPORTANT: Orders are passed in DESCENDING date order (as returned by DB)
+        to verify the algorithm correctly sorts them and processes oldest first.
+        """
+        txns = [
+            make_transaction_info(transaction_id="t1", amount=36.08, date=datetime(2026, 1, 4)),
+            make_transaction_info(transaction_id="t2", amount=46.79, date=datetime(2026, 1, 5)),
+            make_transaction_info(transaction_id="t3", amount=11.87, date=datetime(2026, 1, 6)),
+            make_transaction_info(transaction_id="t4", amount=24.05, date=datetime(2025, 12, 22)),
+        ]
+        # Orders in DESCENDING date order (as database returns them)
+        # This tests that the algorithm sorts by date ascending before processing
+        orders = [
+            make_amazon_order(
+                order_id="mattress-topper",
+                total=71.99,
+                order_date=datetime(2026, 1, 6),  # Newer order first (as DB returns)
+                items=["Mattress Topper"],
+            ),
+            make_amazon_order(
+                order_id="toilet-supplies",
+                total=82.87,
+                order_date=datetime(2026, 1, 3),  # Older order second
+                items=["Toilet Seat"],
+            ),
+        ]
+
+        result = find_combo_matches(txns, orders, window_days=24, amount_tolerance=0.10)
+
+        # Should only find ONE combo (the $82.87 one from Jan 3)
+        # The $71.99 combo should NOT be found because $36.08 is already used
+        # by the older order (algorithm processes oldest first)
+        assert len(result) == 1
+        order, combo_txns = result[0]
+        assert order.order_id == "toilet-supplies"
+
+        # The $11.87 transaction should NOT be in any combo
+        all_combo_txn_ids = {t.transaction_id for _, txns in result for t in txns}
+        assert "t3" not in all_combo_txn_ids  # $11.87 should not be matched
+
 
 # ============================================================================
 # match_transactions_two_stage tests
