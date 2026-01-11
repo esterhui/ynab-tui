@@ -43,6 +43,12 @@ class MockYNABClient:
         self.update_calls: list[dict] = []
         self.split_calls: list[dict] = []
         self.budget_id = "budget-123"
+        # Mock category mapping for testing
+        self._category_names: dict[str, str] = {
+            "cat-1": "A",
+            "cat-2": "B",
+            "cat-groceries": "Groceries",
+        }
 
     def get_all_transactions(self, since_date: datetime | None = None) -> list[Transaction]:
         """Return mock transactions."""
@@ -75,6 +81,8 @@ class MockYNABClient:
             if t.id == transaction_id:
                 if category_id:
                     t.category_id = category_id
+                    # Also set category_name from our mock mapping (simulates YNAB response)
+                    t.category_name = self._category_names.get(category_id, "Unknown")
                 if memo is not None:
                     t.memo = memo
                 if approved is not None:
@@ -740,6 +748,132 @@ class TestPushYnab:
         assert result.pushed == 1
         assert result.succeeded == 0
         assert len(result.pushed_ids) == 0
+
+
+class TestPushFieldPreservation:
+    """Tests for field preservation during push operations."""
+
+    def test_push_approval_only_preserves_existing_category(
+        self, temp_db: Database, mock_ynab: MockYNABClient, mock_amazon: MockAmazonClient
+    ) -> None:
+        """Pushing approval-only change preserves existing category/memo."""
+        # Transaction already categorized on YNAB
+        txn = make_transaction(
+            id="txn-categorized",
+            category_id="cat-groceries",
+            category_name="Groceries",
+            approved=False,
+        )
+        mock_ynab.transactions = [txn]
+        temp_db.upsert_ynab_transaction(txn)
+
+        # Pending change only sets approved=True (no category change)
+        temp_db.create_pending_change(
+            "txn-categorized",
+            {"approved": True},  # Only approval
+            {"approved": False},
+            "update",
+        )
+
+        service = SyncService(temp_db, mock_ynab, mock_amazon)
+        result = service.push_ynab()
+
+        assert result.succeeded == 1
+
+        # Verify the update call didn't send category_id
+        call = mock_ynab.update_calls[0]
+        assert call["category_id"] is None  # Not sent
+
+        # Verify transaction still has category in DB
+        stored = temp_db.get_ynab_transaction("txn-categorized")
+        assert stored["category_id"] == "cat-groceries"
+
+    def test_push_split_preserves_original_fields(
+        self, temp_db: Database, mock_ynab: MockYNABClient, mock_amazon: MockAmazonClient
+    ) -> None:
+        """Splitting a transaction preserves original payee/amount."""
+        # Transaction with existing data
+        txn = make_transaction(
+            id="txn-to-split",
+            amount=-100.0,
+            payee_name="Amazon",
+            approved=False,
+        )
+        mock_ynab.transactions = [txn]
+        temp_db.upsert_ynab_transaction(txn)
+
+        # Create pending split
+        temp_db.create_pending_change(
+            "txn-to-split",
+            {"category_name": "Split", "approved": True},
+            {"category_id": None},
+            "split",
+        )
+        temp_db.mark_pending_split(
+            "txn-to-split",
+            [
+                {"category_id": "cat-1", "category_name": "A", "amount": -60.0},
+                {"category_id": "cat-2", "category_name": "B", "amount": -40.0},
+            ],
+        )
+
+        service = SyncService(temp_db, mock_ynab, mock_amazon)
+        result = service.push_ynab()
+
+        assert result.succeeded == 1
+
+        # Verify split call was made correctly
+        call = mock_ynab.split_calls[0]
+        assert len(call["splits"]) == 2
+        assert call["approve"] is True
+
+        # After split, transaction should still have original payee
+        stored = temp_db.get_ynab_transaction("txn-to-split")
+        assert stored["payee_name"] == "Amazon"
+
+    def test_push_category_change_preserves_memo(
+        self, temp_db: Database, mock_ynab: MockYNABClient, mock_amazon: MockAmazonClient
+    ) -> None:
+        """Changing category preserves existing memo."""
+        txn = make_transaction(
+            id="txn-with-memo",
+            category_id=None,
+            approved=False,
+        )
+        # Add memo to the transaction
+        txn_with_memo = Transaction(
+            id="txn-with-memo",
+            date=txn.date,
+            amount=txn.amount,
+            payee_name=txn.payee_name,
+            account_name=txn.account_name,
+            memo="Important note",
+            category_id=None,
+            approved=False,
+        )
+        mock_ynab.transactions = [txn_with_memo]
+        temp_db.upsert_ynab_transaction(txn_with_memo)
+
+        # Pending change sets category but not memo
+        temp_db.create_pending_change(
+            "txn-with-memo",
+            {"category_id": "cat-groceries", "category_name": "Groceries", "approved": True},
+            {"category_id": None},
+            "update",
+        )
+
+        service = SyncService(temp_db, mock_ynab, mock_amazon)
+        result = service.push_ynab()
+
+        assert result.succeeded == 1
+
+        # Verify memo wasn't sent (should preserve existing)
+        call = mock_ynab.update_calls[0]
+        assert call["memo"] is None  # Not sent
+
+        # Verify memo preserved in DB
+        stored = temp_db.get_ynab_transaction("txn-with-memo")
+        assert stored["memo"] == "Important note"
 
 
 class TestBuildPushSummary:

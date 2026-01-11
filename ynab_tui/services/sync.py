@@ -168,6 +168,42 @@ class SyncService:
                 logger.debug("Failed to fetch Amazon orders for year %d: %s", year, e)
         return orders
 
+    def _compute_expected_transaction(
+        self,
+        local_txn: dict,
+        pending_change: dict,
+    ) -> dict:
+        """Compute expected transaction state after applying pending change.
+
+        Merges the local transaction with the pending change to determine
+        what the YNAB response should contain after a successful push.
+
+        Args:
+            local_txn: Current transaction from local database.
+            pending_change: Pending change with new_values.
+
+        Returns:
+            Dict with expected values for key fields.
+        """
+        expected = dict(local_txn)  # Copy local state
+        new_values = pending_change.get("new_values", {})
+
+        # Fallback to legacy columns if new_values is empty
+        if not new_values:
+            new_values = {}
+            if pending_change.get("new_category_id"):
+                new_values["category_id"] = pending_change["new_category_id"]
+                new_values["category_name"] = pending_change.get("new_category_name")
+            if pending_change.get("new_approved") is not None:
+                new_values["approved"] = pending_change["new_approved"]
+
+        # Apply pending change values
+        for key in ["category_id", "category_name", "memo", "approved"]:
+            if key in new_values:
+                expected[key] = new_values[key]
+
+        return expected
+
     def pull_ynab(
         self,
         full: bool = False,
@@ -703,48 +739,60 @@ class SyncService:
                             updated_txn.approved,
                         )
 
-                        # Verify: all pushed values match returned transaction
+                        # Comprehensive verification: compare YNAB response to expected state
+                        # This catches unexpected changes to fields we didn't intend to modify
+                        local_txn = self._db.get_ynab_transaction(txn_id)
+                        if local_txn is None:
+                            logger.warning(
+                                "Cannot verify push for %s: transaction not found in local DB",
+                                txn_id,
+                            )
+                            local_txn = {}  # Fall back to empty dict for verification
+                        expected = self._compute_expected_transaction(local_txn, change)
+
                         verified = True
                         verify_details = []
 
-                        if "category_id" in new_values and new_values["category_id"]:
-                            cat_match = updated_txn.category_id == new_values["category_id"]
-                            verified = verified and cat_match
-                            verify_details.append(
-                                f"category: sent={new_values['category_id']}, "
-                                f"received={updated_txn.category_id}, match={cat_match}"
-                            )
-                        if "memo" in new_values:
-                            # memo="" is valid (clears memo)
-                            memo_match = updated_txn.memo == new_values["memo"]
-                            verified = verified and memo_match
-                            verify_details.append(
-                                f"memo: sent={repr(new_values['memo'])}, "
-                                f"received={repr(updated_txn.memo)}, match={memo_match}"
-                            )
-                        if "approved" in new_values:
-                            approved_match = updated_txn.approved == new_values["approved"]
-                            verified = verified and approved_match
-                            verify_details.append(
-                                f"approved: sent={new_values['approved']}, "
-                                f"received={updated_txn.approved}, match={approved_match}"
-                            )
+                        # Check important fields - detect unexpected clearing
+                        # category_name is derived from category_id, so skip it if category_id changed
+                        category_id_changed = "category_id" in new_values
+                        fields_to_verify = ["category_id", "memo", "approved"]
+                        if not category_id_changed:
+                            # Only verify category_name if we didn't change category_id
+                            # (YNAB will return new category_name when category_id changes)
+                            fields_to_verify.append("category_name")
+
+                        for field in fields_to_verify:
+                            expected_val = expected.get(field)
+                            actual_val = getattr(updated_txn, field, None)
+                            field_match = expected_val == actual_val
+                            if not field_match:
+                                verified = False
+                                verify_details.append(
+                                    f"{field}: expected={repr(expected_val)}, "
+                                    f"got={repr(actual_val)}"
+                                )
 
                         # Log detailed verification results
-                        logger.info(
-                            "Push verification for %s: verified=%s | %s",
-                            txn_id,
-                            verified,
-                            " | ".join(verify_details),
-                        )
+                        if verify_details:
+                            logger.info(
+                                "Push verification for %s: verified=%s | %s",
+                                txn_id,
+                                verified,
+                                " | ".join(verify_details),
+                            )
+                        else:
+                            logger.debug(
+                                "Push verification for %s: verified=%s (all fields match)",
+                                txn_id,
+                                verified,
+                            )
                         if not verified:
                             logger.warning(
-                                "Push verification FAILED for %s: "
-                                "sent=%s, received category=%s, approved=%s",
+                                "Push verification FAILED for %s: unexpected changes detected. "
+                                "Mismatches: %s",
                                 txn_id,
-                                new_values,
-                                updated_txn.category_id,
-                                updated_txn.approved,
+                                "; ".join(verify_details),
                             )
 
                     if verified:

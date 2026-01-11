@@ -512,12 +512,16 @@ class YNABClient:
 
                 # Build ExistingTransaction with only provided fields
                 # Note: memo="" is valid (clears memo), but memo=None means don't change
-                # Pass parameters directly to avoid mypy dict unpacking issues
-                existing_txn = ynab.ExistingTransaction(
-                    category_id=category_id,
-                    memo=memo,
-                    approved=approved,
-                )
+                # IMPORTANT: Only include fields with actual values to avoid clearing
+                # existing data. The YNAB API treats null as "clear this field".
+                kwargs: dict[str, str | bool] = {}
+                if category_id is not None:
+                    kwargs["category_id"] = category_id
+                if memo is not None:
+                    kwargs["memo"] = memo
+                if approved is not None:
+                    kwargs["approved"] = approved
+                existing_txn = ynab.ExistingTransaction(**kwargs)  # type: ignore[arg-type]
                 wrapper = ynab.PutTransactionWrapper(transaction=existing_txn)
 
                 response = transactions_api.update_transaction(
