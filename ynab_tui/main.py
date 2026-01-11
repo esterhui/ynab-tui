@@ -54,31 +54,28 @@ log_file = ""
 
 
 def _setup_logging(cfg) -> None:
-    """Configure logging based on config settings."""
+    """Configure logging based on config settings.
+
+    Logs only to file if log_file is configured, otherwise no logging setup.
+    """
     from .config import Config
 
     if not isinstance(cfg, Config):
         return
 
+    # Only configure logging if a log file is specified
+    if not cfg.logging.log_file:
+        return
+
     level = getattr(logging, cfg.logging.log_level.upper(), logging.WARNING)
 
-    handlers: list[logging.Handler] = []
+    log_path = cfg.data_dir / cfg.logging.log_file
+    file_handler = logging.FileHandler(log_path)
+    file_handler.setFormatter(
+        logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    )
 
-    # Always log to stderr
-    stderr_handler = logging.StreamHandler()
-    stderr_handler.setFormatter(logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
-    handlers.append(stderr_handler)
-
-    # Optionally log to file
-    if cfg.logging.log_file:
-        log_path = cfg.data_dir / cfg.logging.log_file
-        file_handler = logging.FileHandler(log_path)
-        file_handler.setFormatter(
-            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        )
-        handlers.append(file_handler)
-
-    logging.basicConfig(level=level, handlers=handlers, force=True)
+    logging.basicConfig(level=level, handlers=[file_handler], force=True)
 
 
 def _has_credentials_configured(cfg) -> bool:

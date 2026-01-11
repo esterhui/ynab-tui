@@ -186,6 +186,13 @@ class SyncService:
         Returns:
             PullResult with statistics.
         """
+        logger.debug(
+            "pull_ynab started: full=%s, since_days=%s, dry_run=%s, fix=%s",
+            full,
+            since_days,
+            dry_run,
+            fix,
+        )
         result = PullResult(source="ynab")
 
         try:
@@ -194,15 +201,28 @@ class SyncService:
             if since_days is not None:
                 # Explicit day range - skip sync state check
                 since_date = datetime.now() - timedelta(days=since_days)
+                logger.debug("Using explicit since_days=%d, since_date=%s", since_days, since_date)
             elif not full:
                 sync_state = self._db.get_sync_state("ynab")
                 if sync_state and sync_state.get("last_sync_date"):
                     # Go back sync_overlap_days to catch any delayed transactions
                     overlap_days = self._cat_config.sync_overlap_days
                     since_date = sync_state["last_sync_date"] - timedelta(days=overlap_days)
+                    logger.debug(
+                        "Incremental sync: last_sync=%s, overlap=%d days, since_date=%s",
+                        sync_state["last_sync_date"],
+                        overlap_days,
+                        since_date,
+                    )
+                else:
+                    logger.debug("No sync state found, will fetch all transactions")
+            else:
+                logger.debug("Full sync requested, fetching all transactions")
 
             # Fetch transactions from YNAB
+            logger.debug("Fetching transactions from YNAB API (since_date=%s)", since_date)
             transactions = self._ynab.get_all_transactions(since_date=since_date)
+            logger.debug("Fetched %d transactions from YNAB", len(transactions))
             result.fetched = len(transactions)
 
             if transactions:
@@ -221,6 +241,28 @@ class SyncService:
                         existing and existing["category_id"] and not txn.category_id and not pending
                     )
                     local_category = existing["category_name"] if existing and is_conflict else ""
+
+                    # Log conflict detection details
+                    if is_conflict and existing:
+                        logger.info(
+                            "CONFLICT detected for txn %s (%s, $%.2f): "
+                            "local_category='%s' (id=%s), YNAB returned category_id=%s",
+                            txn.id,
+                            txn.payee_name,
+                            txn.amount,
+                            existing["category_name"],
+                            existing["category_id"],
+                            txn.category_id,
+                        )
+                    elif existing and existing["category_id"] and txn.category_id:
+                        # Log when categories match (DEBUG level)
+                        if existing["category_id"] != txn.category_id:
+                            logger.debug(
+                                "Category changed for txn %s: local='%s' -> YNAB='%s'",
+                                txn.id,
+                                existing["category_name"],
+                                txn.category_name,
+                            )
                     # txn.amount is already in dollars (converted in _convert_transaction)
                     detail = TransactionDetail(
                         date=txn.date,
@@ -279,11 +321,31 @@ class SyncService:
                             detail.changed_fields = changed_fields
                             result.updated += 1
                             result.details_to_update.append(detail)
+                            # Log each transaction being updated
+                            changes_summary = ", ".join(
+                                f"{f.field_name}: {f.old_value!r} -> {f.new_value!r}"
+                                for f in changed_fields
+                            )
+                            logger.debug(
+                                "UPDATE txn %s (%s $%.2f): %s",
+                                txn.id,
+                                txn.payee_name,
+                                txn.amount,
+                                changes_summary,
+                            )
                         if is_conflict:
                             result.conflicts_found += 1
                     else:
                         result.inserted += 1
                         result.details_to_insert.append(detail)
+                        # Log new transactions being inserted
+                        logger.debug(
+                            "INSERT txn %s (%s $%.2f) category='%s'",
+                            txn.id,
+                            txn.payee_name,
+                            txn.amount,
+                            txn.category_name or "Uncategorized",
+                        )
 
                 if not dry_run:
                     # Upsert into database with progress bar
@@ -310,8 +372,19 @@ class SyncService:
             if not dry_run and (transactions or result.total > 0):
                 self._db.update_sync_state("ynab", datetime.now(), result.total)
 
+            # Log pull summary
+            logger.info(
+                "Pull complete (dry_run=%s): fetched=%d, inserted=%d, updated=%d, conflicts=%d",
+                dry_run,
+                result.fetched,
+                result.inserted,
+                result.updated,
+                result.conflicts_found,
+            )
+
         except Exception as e:
             result.errors.append(str(e))
+            logger.exception("Exception during pull_ynab")
 
         return result
 
@@ -513,20 +586,28 @@ class SyncService:
         Returns:
             PushResult with statistics.
         """
+        logger.debug("push_ynab started: dry_run=%s", dry_run)
         result = PushResult()
 
         try:
             # Get pending changes from delta table
             pending_changes = self._db.get_all_pending_changes()
             result.pushed = len(pending_changes)
+            logger.debug("Found %d pending changes to push", len(pending_changes))
 
             if dry_run or result.pushed == 0:
                 # Build summary for display
                 result.summary = self._build_push_summary(pending_changes)
+                logger.info(
+                    "Push complete (dry_run=%s): %d pending changes, no changes made",
+                    dry_run,
+                    result.pushed,
+                )
                 return result
 
             # Push each change
             total_changes = len(pending_changes)
+            logger.info("Starting push of %d changes to YNAB", total_changes)
             for idx, change in enumerate(pending_changes):
                 try:
                     txn_id = change["transaction_id"]
@@ -536,8 +617,16 @@ class SyncService:
 
                     if change_type == "split":
                         # Handle split transaction
+                        logger.debug(
+                            "Processing SPLIT for txn %s (%d/%d)", txn_id, idx + 1, total_changes
+                        )
                         pending_splits = self._db.get_pending_splits(txn_id)
                         if pending_splits:
+                            logger.debug(
+                                "Sending split to YNAB: txn=%s, splits=%d",
+                                txn_id,
+                                len(pending_splits),
+                            )
                             # Create split transaction in YNAB
                             updated_txn = self._ynab.create_split_transaction(
                                 transaction_id=txn_id,
@@ -550,11 +639,22 @@ class SyncService:
                                 updated_txn.category_name == "Split"
                                 and updated_txn.approved is True
                             )
+                            logger.info(
+                                "Split push %s: YNAB returned category_name='%s', "
+                                "approved=%s, verified=%s",
+                                txn_id,
+                                updated_txn.category_name,
+                                updated_txn.approved,
+                                verified,
+                            )
                             if verified:
                                 # Clear pending splits after successful push
                                 self._db.clear_pending_splits(txn_id)
                                 # Save subtransactions to database (they're in updated_txn)
                                 self._db.upsert_ynab_transaction(updated_txn)
+                                logger.debug(
+                                    "Split %s: cleared pending, saved subtransactions", txn_id
+                                )
                     else:
                         # Generic update - handles category, memo, approval
                         new_values = change.get("new_values", {})
@@ -567,6 +667,23 @@ class SyncService:
                             if change.get("new_approved") is not None:
                                 new_values["approved"] = change["new_approved"]
 
+                        # Log what we're about to send
+                        logger.debug(
+                            "Processing UPDATE for txn %s (%d/%d): payee='%s', amount=%.2f",
+                            txn_id,
+                            idx + 1,
+                            total_changes,
+                            change.get("payee_name", "?"),
+                            change.get("amount", 0),
+                        )
+                        logger.debug(
+                            "Sending to YNAB: txn=%s, category_id=%s, memo=%s, approved=%s",
+                            txn_id,
+                            new_values.get("category_id"),
+                            repr(new_values.get("memo")) if "memo" in new_values else "(unchanged)",
+                            new_values.get("approved", True),
+                        )
+
                         # Use generic update method
                         updated_txn = self._ynab.update_transaction(
                             transaction_id=txn_id,
@@ -575,28 +692,59 @@ class SyncService:
                             approved=new_values.get("approved", True),  # Default approve
                         )
 
+                        # Log what YNAB returned
+                        logger.debug(
+                            "YNAB response for %s: category_id=%s, category_name='%s', "
+                            "memo=%s, approved=%s",
+                            txn_id,
+                            updated_txn.category_id,
+                            updated_txn.category_name,
+                            repr(updated_txn.memo),
+                            updated_txn.approved,
+                        )
+
                         # Verify: all pushed values match returned transaction
                         verified = True
+                        verify_details = []
+
                         if "category_id" in new_values and new_values["category_id"]:
-                            verified = verified and (
-                                updated_txn.category_id == new_values["category_id"]
+                            cat_match = updated_txn.category_id == new_values["category_id"]
+                            verified = verified and cat_match
+                            verify_details.append(
+                                f"category: sent={new_values['category_id']}, "
+                                f"received={updated_txn.category_id}, match={cat_match}"
                             )
                         if "memo" in new_values:
                             # memo="" is valid (clears memo)
-                            verified = verified and (updated_txn.memo == new_values["memo"])
+                            memo_match = updated_txn.memo == new_values["memo"]
+                            verified = verified and memo_match
+                            verify_details.append(
+                                f"memo: sent={repr(new_values['memo'])}, "
+                                f"received={repr(updated_txn.memo)}, match={memo_match}"
+                            )
                         if "approved" in new_values:
-                            verified = verified and (updated_txn.approved == new_values["approved"])
+                            approved_match = updated_txn.approved == new_values["approved"]
+                            verified = verified and approved_match
+                            verify_details.append(
+                                f"approved: sent={new_values['approved']}, "
+                                f"received={updated_txn.approved}, match={approved_match}"
+                            )
 
-                        # Log push verification result for debugging
+                        # Log detailed verification results
                         logger.info(
-                            f"Push {txn_id}: sent category={new_values.get('category_id')}, "
-                            f"received category={updated_txn.category_id}, verified={verified}"
+                            "Push verification for %s: verified=%s | %s",
+                            txn_id,
+                            verified,
+                            " | ".join(verify_details),
                         )
                         if not verified:
                             logger.warning(
-                                f"Push verification FAILED for {txn_id}: "
-                                f"sent={new_values}, received category={updated_txn.category_id}, "
-                                f"approved={updated_txn.approved}"
+                                "Push verification FAILED for %s: "
+                                "sent=%s, received category=%s, approved=%s",
+                                txn_id,
+                                new_values,
+                                updated_txn.category_id,
+                                updated_txn.approved,
                             )
 
                     if verified:
@@ -609,9 +757,15 @@ class SyncService:
                             self._db.apply_pending_change(txn_id)
                         result.succeeded += 1
                         result.pushed_ids.append(txn_id)
+                        logger.debug(
+                            "Push SUCCESS for %s: applied change, deleted pending_change", txn_id
+                        )
                     else:
                         # YNAB returned different data than expected - keep in pending
                         result.failed += 1
+                        logger.warning(
+                            "Push FAILED for %s: keeping in pending_changes for retry", txn_id
+                        )
                         if updated_txn:
                             result.errors.append(
                                 f"Verification failed for {txn_id}: "
@@ -625,6 +779,7 @@ class SyncService:
                 except Exception as e:
                     result.failed += 1
                     result.errors.append(f"Failed to push {change['transaction_id']}: {e}")
+                    logger.exception("Exception during push for %s", change["transaction_id"])
 
                 # Report progress after each transaction
                 if progress_callback:
@@ -634,8 +789,17 @@ class SyncService:
             if hasattr(self._ynab, "save_transactions"):
                 self._ynab.save_transactions()
 
+            # Log push summary
+            logger.info(
+                "Push complete: %d succeeded, %d failed out of %d total",
+                result.succeeded,
+                result.failed,
+                total_changes,
+            )
+
         except Exception as e:
             result.errors.append(str(e))
+            logger.exception("Exception during push_ynab")
 
         return result
 
