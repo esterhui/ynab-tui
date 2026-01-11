@@ -83,6 +83,14 @@ class DisplayConfig:
 
 
 @dataclass
+class LoggingConfig:
+    """Logging configuration."""
+
+    log_level: str = "WARNING"  # DEBUG, INFO, WARNING, ERROR
+    log_file: str = ""  # Empty = no file logging, or path like "ynab-tui.log"
+
+
+@dataclass
 class Config:
     """Main application configuration."""
 
@@ -91,6 +99,7 @@ class Config:
     categorization: CategorizationConfig = field(default_factory=CategorizationConfig)
     payees: PayeesConfig = field(default_factory=PayeesConfig)
     display: DisplayConfig = field(default_factory=DisplayConfig)
+    logging: LoggingConfig = field(default_factory=LoggingConfig)
     data_dir: Path = field(
         default_factory=lambda: Path(
             os.environ.get("YNAB_TUI_DATA_DIR", str(Path.home() / ".config" / "ynab-tui"))
@@ -227,10 +236,17 @@ def load_config(config_path: Optional[Path] = None) -> Config:
         color_status_letters=display_data.get("color_status_letters", False),
     )
 
+    logging_data = toml_data.get("logging", {})
+    logging_cfg = LoggingConfig(
+        log_level=_get_env("YNAB_TUI_LOG_LEVEL", logging_data.get("log_level", "WARNING")),
+        log_file=logging_data.get("log_file", ""),
+    )
+
     return Config(
         ynab=ynab,
         amazon=amazon,
         categorization=categorization,
         payees=payees,
         display=display,
+        logging=logging_cfg,
     )
