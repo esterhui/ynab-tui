@@ -3,6 +3,7 @@
 Provides both TUI and CLI interfaces for transaction categorization.
 """
 
+import logging
 import os
 from pathlib import Path
 
@@ -13,8 +14,8 @@ from .cli import (
     display_amazon_match_results,
     display_dry_run_amazon,
     display_dry_run_categories,
-    display_dry_run_transactions,
     display_pending_changes,
+    display_pull_transactions,
     format_date_for_display,
     get_categorizer,
     get_sync_service,
@@ -41,9 +42,43 @@ username = ""  # or set AMAZON_USERNAME environment variable
 password = ""  # or set AMAZON_PASSWORD environment variable
 otp_secret = ""  # TOTP secret for 2FA (optional)
 
+[logging]
+# Log level: DEBUG, INFO, WARNING, ERROR (default: WARNING)
+log_level = "WARNING"
+# Log file (relative to data dir, empty = no file logging)
+log_file = ""
+
 # For all configuration options, see:
 # https://github.com/esterhui/ynab-tui/blob/main/config.example.toml
 """
+
+
+def _setup_logging(cfg) -> None:
+    """Configure logging based on config settings."""
+    from .config import Config
+
+    if not isinstance(cfg, Config):
+        return
+
+    level = getattr(logging, cfg.logging.log_level.upper(), logging.WARNING)
+
+    handlers: list[logging.Handler] = []
+
+    # Always log to stderr
+    stderr_handler = logging.StreamHandler()
+    stderr_handler.setFormatter(logging.Formatter("%(name)s - %(levelname)s - %(message)s"))
+    handlers.append(stderr_handler)
+
+    # Optionally log to file
+    if cfg.logging.log_file:
+        log_path = cfg.data_dir / cfg.logging.log_file
+        file_handler = logging.FileHandler(log_path)
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        )
+        handlers.append(file_handler)
+
+    logging.basicConfig(level=level, handlers=handlers, force=True)
 
 
 def _has_credentials_configured(cfg) -> bool:
@@ -71,6 +106,9 @@ def main(ctx, config, budget, mock, mouse, load_since_months):
     """
     config_path = Path(config) if config else None
     cfg = load_config(config_path)
+
+    # Setup logging based on config
+    _setup_logging(cfg)
 
     # Override budget from command line if specified
     budget_specified = budget is not None
@@ -732,8 +770,11 @@ def amazon_match(ctx, verbose):
     is_flag=True,
     help="Fix conflicts by marking local categories for push to YNAB",
 )
+@click.option(
+    "-v", "--verbose", is_flag=True, help="Show full diff of changed fields (with --dry-run)"
+)
 @click.pass_context
-def pull(ctx, full, ynab, amazon, amazon_year, since_days, dry_run, fix):
+def pull(ctx, full, ynab, amazon, amazon_year, since_days, dry_run, fix, verbose):
     """Pull data from YNAB and Amazon to local database.
 
     Downloads categories, transactions and orders to local SQLite for offline
@@ -820,47 +861,32 @@ def pull(ctx, full, ynab, amazon, amazon_year, since_days, dry_run, fix):
                 )
             click.echo(f"    Inserted: {result.inserted}, Updated: {result.updated}")
             click.echo(f"    Total in database: {result.total}")
-            # Show conflict info
+            # Show conflict summary
             if result.conflicts_found > 0:
                 if result.conflicts_fixed > 0:
-                    # Non-dry-run with --fix: conflicts were actually fixed
                     click.echo(
                         click.style(
                             f"    Fixed: {result.conflicts_fixed} conflict(s) marked for push",
                             fg="yellow",
                         )
                     )
-                    # Show details of fixed conflicts
-                    click.echo(click.style("\n  F FIXED (will push on next 'push'):", fg="yellow"))
-                    click.echo(f"  {'Date':<12} {'Payee':<25} {'Amount':>10}  {'Category'}")
-                    click.echo("  " + "-" * 65)
-                    for txn in result.fixed_conflicts:
-                        date_str = txn["date"][:10] if txn.get("date") else ""
-                        payee = (txn.get("payee_name") or "")[:25]
-                        amount = txn.get("amount", 0)
-                        category = txn.get("category_name") or ""
-                        click.echo(
-                            click.style("F ", fg="yellow")
-                            + f"{date_str:<12} {payee:<25} ${amount:>9,.2f}  {category}"
-                        )
                 elif dry_run and fix:
-                    # Dry-run with --fix: would fix conflicts
                     click.echo(
                         click.style(
                             f"    Would fix: {result.conflicts_found} conflict(s)",
                             fg="yellow",
                         )
                     )
-                else:
-                    # No --fix: show conflicts with hint
+                elif not fix:
                     click.echo(
                         click.style(
                             f"    Conflicts: {result.conflicts_found} (use --fix to mark for push)",
                             fg="red",
                         )
                     )
-            if dry_run:
-                display_dry_run_transactions(result, fix=fix)
+
+            # Show transaction details (inserts, updates, conflicts)
+            display_pull_transactions(result, fix=fix, verbose=verbose, dry_run=dry_run)
         else:
             click.echo(click.style(f"  ✗ Error: {result.errors}", fg="red"))
 

@@ -32,6 +32,15 @@ class CategoryDetail:
 
 
 @dataclass
+class FieldChange:
+    """Represents a single field that changed during sync."""
+
+    field_name: str
+    old_value: Any
+    new_value: Any
+
+
+@dataclass
 class TransactionDetail:
     """Transaction info for dry-run display."""
 
@@ -40,6 +49,14 @@ class TransactionDetail:
     amount: float  # In dollars, not milliunits
     is_conflict: bool = False  # True if YNAB uncategorized but local has category
     local_category: str = ""  # Local category name (for conflict display)
+    changed_fields: list[FieldChange] = field(default_factory=list)
+
+    @property
+    def changed_field_summary(self) -> str:
+        """Return comma-separated list of changed field names."""
+        if not self.changed_fields:
+            return ""
+        return ", ".join(f.field_name for f in self.changed_fields)
 
 
 @dataclass
@@ -193,6 +210,81 @@ class SyncService:
                 result.oldest_date = min(t.date for t in transactions)
                 result.newest_date = max(t.date for t in transactions)
 
+                # Compare fetched with database to get change details
+                for txn in transactions:
+                    existing = self._db.get_ynab_transaction(txn.id)
+                    # Check for pending change - if exists, not a conflict
+                    pending = self._db.get_pending_change(txn.id)
+                    # Detect conflict: local has category but YNAB says uncategorized
+                    # (but not if there's already a pending change for this transaction)
+                    is_conflict = bool(
+                        existing and existing["category_id"] and not txn.category_id and not pending
+                    )
+                    local_category = existing["category_name"] if existing and is_conflict else ""
+                    # txn.amount is already in dollars (converted in _convert_transaction)
+                    detail = TransactionDetail(
+                        date=txn.date,
+                        payee_name=txn.payee_name or "",
+                        amount=txn.amount,
+                        is_conflict=is_conflict,
+                        local_category=local_category or "",
+                    )
+                    if existing:
+                        # Skip transactions with pending changes - pull won't update them
+                        if pending:
+                            continue
+
+                        # Check if data would change and track which fields
+                        new_date = txn.date.strftime("%Y-%m-%d")
+                        changed_fields: list[FieldChange] = []
+
+                        if existing["date"][:10] != new_date:
+                            changed_fields.append(
+                                FieldChange("date", existing["date"][:10], new_date)
+                            )
+                        if existing["amount"] != txn.amount:
+                            changed_fields.append(
+                                FieldChange("amount", existing["amount"], txn.amount)
+                            )
+                        if existing["payee_name"] != txn.payee_name:
+                            changed_fields.append(
+                                FieldChange("payee", existing["payee_name"], txn.payee_name)
+                            )
+                        # Skip category comparison for split transactions
+                        # (Split pseudo-category ID varies, but category_name="Split" is consistent)
+                        is_split_match = (
+                            existing["is_split"]
+                            and txn.is_split
+                            and existing["category_name"] == "Split"
+                            and txn.category_name == "Split"
+                        )
+                        if not is_split_match and existing["category_id"] != txn.category_id:
+                            changed_fields.append(
+                                FieldChange(
+                                    "category",
+                                    existing["category_name"] or "Uncategorized",
+                                    txn.category_name or "Uncategorized",
+                                )
+                            )
+                        if existing["memo"] != txn.memo:
+                            changed_fields.append(
+                                FieldChange("memo", existing["memo"] or "", txn.memo or "")
+                            )
+                        if existing["approved"] != txn.approved:
+                            changed_fields.append(
+                                FieldChange("approved", existing["approved"], txn.approved)
+                            )
+
+                        if changed_fields:
+                            detail.changed_fields = changed_fields
+                            result.updated += 1
+                            result.details_to_update.append(detail)
+                        if is_conflict:
+                            result.conflicts_found += 1
+                    else:
+                        result.inserted += 1
+                        result.details_to_insert.append(detail)
+
                 if not dry_run:
                     # Upsert into database with progress bar
                     with tqdm(
@@ -200,6 +292,7 @@ class SyncService:
                     ) as pbar:
                         inserted, updated = self._db.upsert_ynab_transactions(transactions)
                         pbar.update(len(transactions))
+                    # Use DB counts (more accurate than our comparison for edge cases)
                     result.inserted = inserted
                     result.updated = updated
 
@@ -211,64 +304,6 @@ class SyncService:
                             if self._db.fix_conflict_transaction(conflict["id"]):
                                 result.conflicts_fixed += 1
                                 result.fixed_conflicts.append(conflict)
-                else:
-                    # Dry run - compare fetched with database to get accurate counts
-                    for txn in transactions:
-                        existing = self._db.get_ynab_transaction(txn.id)
-                        # Check for pending change - if exists, not a conflict
-                        pending = self._db.get_pending_change(txn.id)
-                        # Detect conflict: local has category but YNAB says uncategorized
-                        # (but not if there's already a pending change for this transaction)
-                        is_conflict = bool(
-                            existing
-                            and existing["category_id"]
-                            and not txn.category_id
-                            and not pending
-                        )
-                        local_category = (
-                            existing["category_name"] if existing and is_conflict else ""
-                        )
-                        # txn.amount is already in dollars (converted in _convert_transaction)
-                        detail = TransactionDetail(
-                            date=txn.date,
-                            payee_name=txn.payee_name or "",
-                            amount=txn.amount,
-                            is_conflict=is_conflict,
-                            local_category=local_category or "",
-                        )
-                        if existing:
-                            # Skip transactions with pending changes - pull won't update them
-                            if pending:
-                                continue
-
-                            # Check if data would change (simplified comparison)
-                            new_date = txn.date.strftime("%Y-%m-%d")
-                            # Skip category_id comparison for split transactions
-                            # (Split pseudo-category ID varies, but category_name="Split" is consistent)
-                            is_split_match = (
-                                existing["is_split"]
-                                and txn.is_split
-                                and existing["category_name"] == "Split"
-                                and txn.category_name == "Split"
-                            )
-                            category_changed = (
-                                not is_split_match and existing["category_id"] != txn.category_id
-                            )
-                            if (
-                                existing["date"][:10] != new_date
-                                or existing["amount"] != txn.amount
-                                or existing["payee_name"] != txn.payee_name
-                                or category_changed
-                                or existing["memo"] != txn.memo
-                                or existing["approved"] != txn.approved
-                            ):
-                                result.updated += 1
-                                result.details_to_update.append(detail)
-                            if is_conflict:
-                                result.conflicts_found += 1
-                        else:
-                            result.inserted += 1
-                            result.details_to_insert.append(detail)
 
             # Update sync state (skip in dry run)
             result.total = self._db.get_transaction_count()

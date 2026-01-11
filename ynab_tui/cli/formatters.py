@@ -5,7 +5,7 @@ Extracts display/formatting logic from main.py for better maintainability.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -358,18 +358,41 @@ def display_dry_run_categories(result: PullResult) -> None:
             click.echo(f"  {name:<30} {group:<25}")
 
 
-def display_dry_run_transactions(result: PullResult, fix: bool = False) -> None:
-    """Display dry-run transaction details.
+def _format_field_value(field_name: str, value: Any) -> str:
+    """Format a field value for display in verbose diff."""
+    if value is None or value == "":
+        return "(empty)"
+    if field_name == "approved":
+        return "Yes" if value else "No"
+    if field_name == "amount":
+        return f"${value:,.2f}"
+    if field_name == "memo":
+        text = str(value)
+        return text[:40] + "..." if len(text) > 40 else text
+    return str(value)
+
+
+def display_pull_transactions(
+    result: PullResult,
+    fix: bool = False,
+    verbose: bool = False,
+    dry_run: bool = False,
+) -> None:
+    """Display transaction pull details (inserts, updates, conflicts).
 
     Args:
         result: PullResult with details_to_insert and details_to_update populated.
-        fix: If True, show conflicts as "F FIXED" (would be marked for push).
+        fix: If True, show conflicts as "F FIXED" (marked for push).
+        verbose: If True, show full diff of old -> new values for each field.
+        dry_run: If True, prefix actions with "Would" (e.g., "Would INSERT").
     """
     if not result.details_to_insert and not result.details_to_update:
         return
 
+    prefix = "Would " if dry_run else ""
+
     if result.details_to_insert:
-        click.echo(click.style("\n  Would INSERT:", fg="green"))
+        click.echo(click.style(f"\n  {prefix}INSERT:", fg="green"))
         click.echo(f"  {'Date':<12} {'Payee':<30} {'Amount':>12}")
         click.echo("  " + "-" * 55)
         for txn in result.details_to_insert:
@@ -383,18 +406,37 @@ def display_dry_run_transactions(result: PullResult, fix: bool = False) -> None:
         non_conflicts = [t for t in result.details_to_update if not t.is_conflict]
 
         if non_conflicts:
-            click.echo(click.style("\n  Would UPDATE:", fg="yellow"))
-            click.echo(f"  {'Date':<12} {'Payee':<30} {'Amount':>12}")
-            click.echo("  " + "-" * 55)
-            for txn in non_conflicts:
-                date_str = txn.date.strftime("%Y-%m-%d")
-                payee = (txn.payee_name or "")[:30]
-                click.echo(f"  {date_str:<12} {payee:<30} ${txn.amount:>10,.2f}")
+            click.echo(click.style(f"\n  {prefix}UPDATE:", fg="yellow"))
+            if verbose:
+                # Verbose mode: show full diff
+                click.echo(f"  {'Date':<12} {'Payee':<25} {'Amount':>10}")
+                click.echo("  " + "-" * 50)
+                for txn in non_conflicts:
+                    date_str = txn.date.strftime("%Y-%m-%d")
+                    payee = (txn.payee_name or "")[:25]
+                    click.echo(f"  {date_str:<12} {payee:<25} ${txn.amount:>9,.2f}")
+                    for change in txn.changed_fields:
+                        old_display = _format_field_value(change.field_name, change.old_value)
+                        new_display = _format_field_value(change.field_name, change.new_value)
+                        click.echo(
+                            click.style(f"      {change.field_name}: ", fg="cyan")
+                            + f"{old_display} -> {new_display}"
+                        )
+            else:
+                # Default mode: add "Changed Fields" column
+                click.echo(f"  {'Date':<12} {'Payee':<25} {'Amount':>10}  {'Changed Fields'}")
+                click.echo("  " + "-" * 70)
+                for txn in non_conflicts:
+                    date_str = txn.date.strftime("%Y-%m-%d")
+                    payee = (txn.payee_name or "")[:25]
+                    changed = txn.changed_field_summary or "unknown"
+                    click.echo(f"  {date_str:<12} {payee:<25} ${txn.amount:>9,.2f}  {changed}")
 
         if conflicts:
             if fix:
                 # Show as "F FIXED" when --fix is used
-                click.echo(click.style("\n  F FIXED (would be marked for push):", fg="yellow"))
+                suffix = " (would be marked for push)" if dry_run else " (will push on next 'push')"
+                click.echo(click.style(f"\n  F FIXED{suffix}:", fg="yellow"))
                 click.echo(f"  {'Date':<12} {'Payee':<25} {'Amount':>10}  {'Category'}")
                 click.echo("  " + "-" * 65)
                 for txn in conflicts:
