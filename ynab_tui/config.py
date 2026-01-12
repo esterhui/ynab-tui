@@ -80,6 +80,8 @@ class DisplayConfig:
     search_match_style: str = "substring"
     # Color-code status letters (A, C, R, M, P, !) in transaction list
     color_status_letters: bool = False
+    # Category suggestion sort: "count" (most used first) or "recent" (most recent first)
+    suggestion_sort: str = "count"
 
 
 @dataclass
@@ -234,6 +236,7 @@ def load_config(config_path: Optional[Path] = None) -> Config:
         cli_category_width=display_data.get("cli_category_width", 20),
         search_match_style=display_data.get("search_match_style", "substring"),
         color_status_letters=display_data.get("color_status_letters", False),
+        suggestion_sort=display_data.get("suggestion_sort", "count"),
     )
 
     logging_data = toml_data.get("logging", {})

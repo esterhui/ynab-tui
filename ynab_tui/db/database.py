@@ -109,7 +109,9 @@ class Database:
                     category_name TEXT NOT NULL,
                     category_id TEXT NOT NULL,
                     amazon_items TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    transaction_id TEXT UNIQUE,
+                    transaction_date DATE
                 );
                 CREATE TABLE IF NOT EXISTS amazon_orders_cache (
                     order_id TEXT PRIMARY KEY,
@@ -295,6 +297,23 @@ class Database:
                 "UPDATE pending_changes SET new_values = ?, original_values = ? WHERE id = ?",
                 (json.dumps(new_values), json.dumps(original_values), row["id"]),
             )
+
+        # Add transaction_id and transaction_date to categorization_history
+        cursor = conn.execute("PRAGMA table_info(categorization_history)")
+        columns = {row[1] for row in cursor.fetchall()}
+        if "transaction_id" not in columns:
+            # Note: SQLite doesn't allow ALTER TABLE ADD COLUMN with UNIQUE constraint
+            # So we add the column without UNIQUE and create a unique index instead
+            conn.execute("ALTER TABLE categorization_history ADD COLUMN transaction_id TEXT")
+        if "transaction_date" not in columns:
+            conn.execute("ALTER TABLE categorization_history ADD COLUMN transaction_date DATE")
+        # Create unique index for transaction_id (enforces uniqueness for migrations)
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_cat_history_txn_unique ON categorization_history(transaction_id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_cat_history_date ON categorization_history(transaction_date)"
+        )
 
     def clear_all(self) -> dict[str, int]:
         """Clear all data from all tables."""
@@ -1226,22 +1245,120 @@ class Database:
         category_id: str,
         amount: Optional[float] = None,
         amazon_items: Optional[list[str]] = None,
+        transaction_id: Optional[str] = None,
+        transaction_date: Optional[date] = None,
     ) -> int:
-        """Record a categorization decision for learning."""
+        """Record a categorization decision for learning.
+
+        Args:
+            payee_name: The payee name.
+            category_name: The category name.
+            category_id: The category ID.
+            amount: Optional transaction amount.
+            amazon_items: Optional list of Amazon item names.
+            transaction_id: Optional transaction ID (prevents duplicate entries).
+            transaction_date: Optional transaction date (for recency sorting).
+
+        Returns:
+            Row ID if inserted, 0 if skipped (duplicate transaction_id).
+        """
         with self._connection() as conn:
-            cursor = conn.execute(
-                """INSERT INTO categorization_history (payee_name, payee_normalized, amount, category_name, category_id, amazon_items)
-                VALUES (?,?,?,?,?,?)""",
-                (
-                    payee_name,
-                    self.normalize_payee(payee_name),
-                    amount,
-                    category_name,
-                    category_id,
-                    json.dumps(amazon_items) if amazon_items else None,
-                ),
-            )
-            return cursor.lastrowid or 0
+            try:
+                cursor = conn.execute(
+                    """INSERT INTO categorization_history
+                    (payee_name, payee_normalized, amount, category_name, category_id, amazon_items, transaction_id, transaction_date)
+                    VALUES (?,?,?,?,?,?,?,?)""",
+                    (
+                        payee_name,
+                        self.normalize_payee(payee_name),
+                        amount,
+                        category_name,
+                        category_id,
+                        json.dumps(amazon_items) if amazon_items else None,
+                        transaction_id,
+                        transaction_date.isoformat() if transaction_date else None,
+                    ),
+                )
+                return cursor.lastrowid or 0
+            except sqlite3.IntegrityError:
+                # Duplicate transaction_id - already recorded
+                return 0
+
+    def needs_history_backfill(self) -> bool:
+        """Check if categorization history needs to be backfilled from transactions.
+
+        Returns True if:
+        - History table has no entries with transaction_id (pre-migration data)
+        - Or history count is much smaller than categorized transaction count
+        """
+        with self._connection() as conn:
+            # Count history entries with transaction_id
+            history_with_txn = conn.execute(
+                "SELECT COUNT(*) as count FROM categorization_history WHERE transaction_id IS NOT NULL"
+            ).fetchone()["count"]
+
+            # Count categorized transactions
+            categorized_txns = conn.execute(
+                "SELECT COUNT(*) as count FROM ynab_transactions WHERE category_id IS NOT NULL AND category_id != ''"
+            ).fetchone()["count"]
+
+            # Backfill needed if history with transaction_id is much smaller
+            # Allow some slack (90%) since some transactions may be uncategorized
+            return history_with_txn < categorized_txns * 0.5
+
+    def backfill_categorization_history(self, progress_callback=None) -> int:
+        """Backfill categorization history from existing transactions.
+
+        Args:
+            progress_callback: Optional callback(current, total) for progress updates.
+
+        Returns:
+            Number of entries added.
+        """
+        with self._connection() as conn:
+            # Get all categorized transactions not already in history
+            rows = conn.execute(
+                """SELECT t.id, t.payee_name, t.category_name, t.category_id, t.amount, t.date
+                FROM ynab_transactions t
+                WHERE t.category_id IS NOT NULL AND t.category_id != ''
+                AND t.payee_name IS NOT NULL
+                AND NOT EXISTS (
+                    SELECT 1 FROM categorization_history h WHERE h.transaction_id = t.id
+                )"""
+            ).fetchall()
+
+            total = len(rows)
+            added = 0
+
+            for i, row in enumerate(rows):
+                try:
+                    conn.execute(
+                        """INSERT INTO categorization_history
+                        (payee_name, payee_normalized, amount, category_name, category_id, transaction_id, transaction_date)
+                        VALUES (?,?,?,?,?,?,?)""",
+                        (
+                            row["payee_name"],
+                            self.normalize_payee(row["payee_name"]),
+                            row["amount"],
+                            row["category_name"],
+                            row["category_id"],
+                            row["id"],
+                            row["date"],
+                        ),
+                    )
+                    added += 1
+                except sqlite3.IntegrityError:
+                    # Skip duplicates
+                    pass
+
+                if progress_callback and (i + 1) % 100 == 0:
+                    progress_callback(i + 1, total)
+
+            # Final progress callback
+            if progress_callback:
+                progress_callback(total, total)
+
+            return added
 
     def get_payee_history(self, payee_name: str, limit: int = 100) -> list[CategorizationRecord]:
         """Get categorization history for a payee."""
@@ -1267,14 +1384,25 @@ class Database:
             ]
 
     def get_payee_category_distribution(
-        self, payee_name: str
+        self, payee_name: str, sort_by: str = "count"
     ) -> dict[str, dict[str, float | int | str]]:
-        """Get category distribution for a payee."""
+        """Get category distribution for a payee.
+
+        Args:
+            payee_name: The payee name to look up.
+            sort_by: Sort order - "count" (most used) or "recent" (most recent).
+
+        Returns:
+            Dict mapping category_name -> {count, percentage, avg_amount, category_id, last_used}.
+        """
         normalized = self.normalize_payee(payee_name)
+        order_clause = "ORDER BY last_used DESC" if sort_by == "recent" else "ORDER BY count DESC"
         with self._connection() as conn:
             rows = conn.execute(
-                """SELECT category_name, category_id, COUNT(*) as count, AVG(amount) as avg_amount
-                FROM categorization_history WHERE payee_normalized = ? GROUP BY category_name, category_id ORDER BY count DESC""",
+                f"""SELECT category_name, category_id, COUNT(*) as count, AVG(amount) as avg_amount,
+                    MAX(transaction_date) as last_used
+                FROM categorization_history WHERE payee_normalized = ?
+                GROUP BY category_name, category_id {order_clause}""",
                 (normalized,),
             ).fetchall()
             if not rows:
@@ -1286,6 +1414,7 @@ class Database:
                     "percentage": row["count"] / total,
                     "avg_amount": row["avg_amount"],
                     "category_id": row["category_id"],
+                    "last_used": row["last_used"],
                 }
                 for row in rows
             }

@@ -882,6 +882,23 @@ def pull(ctx, full, ynab, amazon, amazon_year, since_days, dry_run, fix, verbose
                         )
                     )
 
+            # Show category history backfill info
+            if result.history_backfill_needed:
+                if dry_run:
+                    click.echo(
+                        click.style(
+                            f"    Would build category history: {result.history_backfill_count} entries",
+                            fg="cyan",
+                        )
+                    )
+                else:
+                    click.echo(
+                        click.style(
+                            f"    Built category history: {result.history_backfill_count} entries",
+                            fg="cyan",
+                        )
+                    )
+
             # Show transaction details (inserts, updates, conflicts)
             display_pull_transactions(result, fix=fix, verbose=verbose, dry_run=dry_run)
         else:

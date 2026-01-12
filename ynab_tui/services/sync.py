@@ -88,6 +88,9 @@ class PullResult:
     conflicts_found: int = 0  # Number of conflicts detected
     conflicts_fixed: int = 0  # Number of conflicts marked for push (--fix)
     fixed_conflicts: list[dict] = field(default_factory=list)  # Details of fixed conflicts
+    # Category history backfill tracking
+    history_backfill_needed: bool = False
+    history_backfill_count: int = 0  # Number of entries to backfill (or backfilled)
 
     @property
     def success(self) -> bool:
@@ -394,6 +397,35 @@ class SyncService:
                     result.inserted = inserted
                     result.updated = updated
 
+                    # Backfill categorization history if needed (first run or sparse data)
+                    if self._db.needs_history_backfill():
+                        result.history_backfill_needed = True
+                        logger.info("Backfilling categorization history from transactions...")
+                        with tqdm(desc="Building category history", unit="txn") as pbar:
+
+                            def update_progress(current: int, total: int) -> None:
+                                pbar.total = total
+                                pbar.n = current
+                                pbar.refresh()
+
+                            added = self._db.backfill_categorization_history(
+                                progress_callback=update_progress
+                            )
+                            result.history_backfill_count = added
+                            logger.info("Backfilled %d entries into categorization history", added)
+                    else:
+                        # Just add newly categorized transactions to history
+                        for txn in transactions:
+                            if txn.category_id and txn.payee_name:
+                                self._db.add_categorization(
+                                    payee_name=txn.payee_name,
+                                    category_name=txn.category_name or "",
+                                    category_id=txn.category_id,
+                                    amount=txn.amount,
+                                    transaction_id=txn.id,
+                                    transaction_date=txn.date,
+                                )
+
                     # Check for conflicts and optionally fix them
                     conflicts = self._db.get_conflict_transactions()
                     result.conflicts_found = len(conflicts)
@@ -402,6 +434,22 @@ class SyncService:
                             if self._db.fix_conflict_transaction(conflict["id"]):
                                 result.conflicts_fixed += 1
                                 result.fixed_conflicts.append(conflict)
+                else:
+                    # Dry run: check if backfill would be needed and estimate count
+                    if self._db.needs_history_backfill():
+                        result.history_backfill_needed = True
+                        # Count categorized transactions that would be backfilled
+                        with self._db._connection() as conn:
+                            row = conn.execute(
+                                """SELECT COUNT(*) as count FROM ynab_transactions
+                                WHERE category_id IS NOT NULL AND category_id != ''
+                                AND payee_name IS NOT NULL
+                                AND NOT EXISTS (
+                                    SELECT 1 FROM categorization_history h
+                                    WHERE h.transaction_id = ynab_transactions.id
+                                )"""
+                            ).fetchone()
+                            result.history_backfill_count = row["count"] if row else 0
 
             # Update sync state (skip in dry run)
             result.total = self._db.get_transaction_count()

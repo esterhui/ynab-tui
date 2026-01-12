@@ -165,12 +165,22 @@ class CategoryPickerModal(FuzzySelectModal[CategorySelection]):
             else None
         )
         suggestion_count = 0
+        suggested_ids: set[str] = set()
+        current_in_suggestions = False
+
         if not query and suggestions:
-            for suggestion in suggestions:
+            for i, suggestion in enumerate(suggestions):
                 display_text = self._format_suggestion(suggestion)
+                cat_id = suggestion["category_id"]
+                suggested_ids.add(cat_id)
+
+                # Check if current category is in suggestions
+                if self._current_category_id and cat_id == self._current_category_id:
+                    current_in_suggestions = True
+
                 # Create a category dict that maps to the suggestion
                 cat_dict = {
-                    "id": suggestion["category_id"],
+                    "id": cat_id,
                     "name": suggestion["category_name"],
                     "group_name": suggestion.get("group_name", ""),
                 }
@@ -189,22 +199,44 @@ class CategoryPickerModal(FuzzySelectModal[CategorySelection]):
             list_view.append(ListItem(Static("No matches found")))
             return
 
-        # Add regular categories (limit results for performance)
+        # Add regular categories, excluding those already in suggestions
         max_results = 100
-        for item in self._filtered_items[:max_results]:
+        added = 0
+        for item in self._filtered_items:
+            if added >= max_results:
+                break
+            # Skip categories already shown in suggestions
+            if item["id"] in suggested_ids:
+                continue
             display_text = self._display_fn(item)
             list_view.append(FuzzySelectItem(display_text, item))
+            added += 1
 
         # Determine initial selection
         def set_selection() -> None:
             if generation != self._populate_generation:
                 return
             if not query and self._current_category_id:
-                # Scroll to current category (after suggestions + separator)
-                offset = suggestion_count + (1 if suggestion_count > 0 else 0)
-                current_idx = self._find_current_category_index()
-                list_view.index = offset + current_idx
-            elif len(list_view) > 0:
+                if current_in_suggestions:
+                    # Current category is in suggestions - find its index there
+                    for i, suggestion in enumerate(suggestions or []):
+                        if suggestion["category_id"] == self._current_category_id:
+                            list_view.index = i
+                            return
+                else:
+                    # Scroll to current category in the regular list
+                    # (after suggestions + separator)
+                    offset = suggestion_count + (1 if suggestion_count > 0 else 0)
+                    # Find index in filtered items, excluding suggested ones
+                    idx = 0
+                    for item in self._filtered_items:
+                        if item["id"] in suggested_ids:
+                            continue
+                        if item["id"] == self._current_category_id:
+                            list_view.index = offset + idx
+                            return
+                        idx += 1
+            if len(list_view) > 0:
                 list_view.index = 0
 
         self.call_after_refresh(set_selection)

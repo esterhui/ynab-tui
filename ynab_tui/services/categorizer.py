@@ -84,6 +84,14 @@ class CategorizerService:
             parts.append(f"{pct:.0f}% {cat}")
         return ", ".join(parts)
 
+    def get_suggestion_sort(self) -> str:
+        """Get the suggestion sort setting from config.
+
+        Returns:
+            Sort order: "count" or "recent".
+        """
+        return self._config.display.suggestion_sort
+
     def get_category_suggestions(
         self,
         payee_name: str,
@@ -110,6 +118,7 @@ class CategorizerService:
             - item_count: int (for Amazon, how many items matched)
         """
         suggestions: list[dict] = []
+        sort_by = self.get_suggestion_sort()
 
         if amazon_items:
             # Amazon transaction: look up item history
@@ -136,8 +145,8 @@ class CategorizerService:
                 ]
                 suggestions = sorted_cats
         else:
-            # Non-Amazon: look up payee history
-            payee_dist = self._db.get_payee_category_distribution(payee_name)
+            # Non-Amazon: look up payee history with configured sort
+            payee_dist = self._db.get_payee_category_distribution(payee_name, sort_by=sort_by)
             if payee_dist:
                 for cat_name, stats in list(payee_dist.items())[:limit]:
                     suggestions.append(

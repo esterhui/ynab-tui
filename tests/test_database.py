@@ -1112,3 +1112,323 @@ class TestDatabaseClose:
         history = db2.get_payee_history("Test")
         assert len(history) == 1
         db2.close()
+
+
+# =============================================================================
+# Categorization History Backfill Tests
+# =============================================================================
+
+
+class TestCategorizationHistoryBackfill:
+    """Tests for categorization history backfill and deduplication."""
+
+    def test_add_categorization_with_transaction_id(self, database):
+        """Test adding categorization with transaction_id."""
+        from datetime import date
+
+        record_id = database.add_categorization(
+            payee_name="COSTCO",
+            category_name="Groceries",
+            category_id="cat-001",
+            amount=-89.50,
+            transaction_id="txn-123",
+            transaction_date=date(2025, 1, 15),
+        )
+        assert record_id > 0
+
+        # Verify the record was stored with transaction_id
+        history = database.get_payee_history("COSTCO")
+        assert len(history) == 1
+
+    def test_add_categorization_duplicate_transaction_id_rejected(self, database):
+        """Test that duplicate transaction_id is rejected."""
+        from datetime import date
+
+        # First insert
+        record_id1 = database.add_categorization(
+            payee_name="COSTCO",
+            category_name="Groceries",
+            category_id="cat-001",
+            amount=-89.50,
+            transaction_id="txn-123",
+            transaction_date=date(2025, 1, 15),
+        )
+        assert record_id1 > 0
+
+        # Same transaction_id should be rejected (returns 0)
+        record_id2 = database.add_categorization(
+            payee_name="COSTCO",
+            category_name="Electronics",  # Different category
+            category_id="cat-002",
+            amount=-50.00,
+            transaction_id="txn-123",  # Same transaction_id
+            transaction_date=date(2025, 1, 16),
+        )
+        assert record_id2 == 0
+
+        # Only one record should exist
+        history = database.get_payee_history("COSTCO")
+        assert len(history) == 1
+        assert history[0].category_name == "Groceries"
+
+    def test_same_payee_different_categories_allowed(self, database):
+        """Test that same payee can have different categories (different transactions)."""
+        from datetime import date
+
+        # First transaction -> Groceries
+        database.add_categorization(
+            payee_name="COSTCO",
+            category_name="Groceries",
+            category_id="cat-001",
+            amount=-89.50,
+            transaction_id="txn-1",
+            transaction_date=date(2025, 1, 15),
+        )
+
+        # Second transaction -> Home Improvement
+        database.add_categorization(
+            payee_name="COSTCO",
+            category_name="Home Improvement",
+            category_id="cat-002",
+            amount=-299.00,
+            transaction_id="txn-2",
+            transaction_date=date(2025, 1, 16),
+        )
+
+        # Third transaction -> Groceries again
+        database.add_categorization(
+            payee_name="COSTCO",
+            category_name="Groceries",
+            category_id="cat-001",
+            amount=-120.00,
+            transaction_id="txn-3",
+            transaction_date=date(2025, 1, 17),
+        )
+
+        # All three should exist
+        history = database.get_payee_history("COSTCO")
+        assert len(history) == 3
+
+        # Distribution should show both categories
+        dist = database.get_payee_category_distribution("COSTCO")
+        assert "Groceries" in dist
+        assert "Home Improvement" in dist
+        assert dist["Groceries"]["count"] == 2
+        assert dist["Home Improvement"]["count"] == 1
+
+    def test_needs_history_backfill_empty_db(self, database):
+        """Test backfill needed when history is empty but transactions exist."""
+        # Add categorized transaction
+        txn = Transaction(
+            id="txn-1",
+            date=datetime(2025, 1, 15),
+            amount=-50.00,
+            payee_name="AMAZON",
+            category_id="cat-001",
+            category_name="Electronics",
+        )
+        database.upsert_ynab_transaction(txn)
+
+        # History is empty, so backfill is needed
+        assert database.needs_history_backfill() is True
+
+    def test_needs_history_backfill_after_backfill(self, database):
+        """Test backfill not needed after it's done."""
+        # Add categorized transactions
+        for i in range(5):
+            txn = Transaction(
+                id=f"txn-{i}",
+                date=datetime(2025, 1, i + 1),
+                amount=-50.00 - i,
+                payee_name="AMAZON",
+                category_id="cat-001",
+                category_name="Electronics",
+            )
+            database.upsert_ynab_transaction(txn)
+
+        # Backfill
+        added = database.backfill_categorization_history()
+        assert added == 5
+
+        # Now backfill should not be needed
+        assert database.needs_history_backfill() is False
+
+    def test_backfill_categorization_history(self, database):
+        """Test backfilling history from transactions."""
+        # Add various categorized transactions
+        txns = [
+            Transaction(
+                id="txn-1",
+                date=datetime(2025, 1, 15),
+                amount=-50.00,
+                payee_name="AMAZON",
+                category_id="cat-001",
+                category_name="Electronics",
+            ),
+            Transaction(
+                id="txn-2",
+                date=datetime(2025, 1, 16),
+                amount=-100.00,
+                payee_name="COSTCO",
+                category_id="cat-002",
+                category_name="Groceries",
+            ),
+            Transaction(
+                id="txn-3",  # Uncategorized - should NOT be added
+                date=datetime(2025, 1, 17),
+                amount=-25.00,
+                payee_name="Unknown Store",
+                category_id=None,
+                category_name=None,
+            ),
+        ]
+        for txn in txns:
+            database.upsert_ynab_transaction(txn)
+
+        # Run backfill
+        added = database.backfill_categorization_history()
+
+        # Should have added 2 (only categorized ones)
+        assert added == 2
+
+        # Verify history
+        amazon_history = database.get_payee_history("AMAZON")
+        assert len(amazon_history) == 1
+
+        costco_history = database.get_payee_history("COSTCO")
+        assert len(costco_history) == 1
+
+    def test_backfill_is_idempotent(self, database):
+        """Test that running backfill twice doesn't create duplicates."""
+        txn = Transaction(
+            id="txn-1",
+            date=datetime(2025, 1, 15),
+            amount=-50.00,
+            payee_name="AMAZON",
+            category_id="cat-001",
+            category_name="Electronics",
+        )
+        database.upsert_ynab_transaction(txn)
+
+        # First backfill
+        added1 = database.backfill_categorization_history()
+        assert added1 == 1
+
+        # Second backfill should add nothing
+        added2 = database.backfill_categorization_history()
+        assert added2 == 0
+
+        # Still just one history entry
+        history = database.get_payee_history("AMAZON")
+        assert len(history) == 1
+
+    def test_backfill_progress_callback(self, database):
+        """Test that progress callback is called."""
+        # Add transactions
+        for i in range(10):
+            txn = Transaction(
+                id=f"txn-{i}",
+                date=datetime(2025, 1, i + 1),
+                amount=-10.00 * i,
+                payee_name=f"Payee {i}",
+                category_id="cat-001",
+                category_name="General",
+            )
+            database.upsert_ynab_transaction(txn)
+
+        # Track progress calls
+        progress_calls = []
+
+        def track_progress(current, total):
+            progress_calls.append((current, total))
+
+        database.backfill_categorization_history(progress_callback=track_progress)
+
+        # Should have been called at least for final progress
+        assert len(progress_calls) > 0
+        # Last call should be (total, total)
+        assert progress_calls[-1][0] == progress_calls[-1][1]
+
+    def test_get_payee_category_distribution_sort_by_count(self, database):
+        """Test sorting distribution by count (default)."""
+        from datetime import date
+
+        # Add more entries for Groceries than Home Improvement
+        for i in range(5):
+            database.add_categorization(
+                payee_name="COSTCO",
+                category_name="Groceries",
+                category_id="cat-001",
+                amount=-50.00,
+                transaction_id=f"txn-groceries-{i}",
+                transaction_date=date(2025, 1, i + 1),
+            )
+
+        for i in range(2):
+            database.add_categorization(
+                payee_name="COSTCO",
+                category_name="Home Improvement",
+                category_id="cat-002",
+                amount=-100.00,
+                transaction_id=f"txn-home-{i}",
+                transaction_date=date(2025, 1, 20 + i),  # More recent
+            )
+
+        # Sort by count (default)
+        dist = database.get_payee_category_distribution("COSTCO", sort_by="count")
+
+        # Groceries should be first (5 > 2)
+        categories = list(dist.keys())
+        assert categories[0] == "Groceries"
+        assert dist["Groceries"]["count"] == 5
+
+    def test_get_payee_category_distribution_sort_by_recent(self, database):
+        """Test sorting distribution by most recent."""
+        from datetime import date
+
+        # Add older entries for Groceries
+        for i in range(5):
+            database.add_categorization(
+                payee_name="COSTCO",
+                category_name="Groceries",
+                category_id="cat-001",
+                amount=-50.00,
+                transaction_id=f"txn-groceries-{i}",
+                transaction_date=date(2025, 1, i + 1),  # Jan 1-5
+            )
+
+        # Add more recent entries for Home Improvement
+        for i in range(2):
+            database.add_categorization(
+                payee_name="COSTCO",
+                category_name="Home Improvement",
+                category_id="cat-002",
+                amount=-100.00,
+                transaction_id=f"txn-home-{i}",
+                transaction_date=date(2025, 1, 20 + i),  # Jan 20-21
+            )
+
+        # Sort by recent
+        dist = database.get_payee_category_distribution("COSTCO", sort_by="recent")
+
+        # Home Improvement should be first (most recent)
+        categories = list(dist.keys())
+        assert categories[0] == "Home Improvement"
+
+    def test_get_payee_category_distribution_includes_last_used(self, database):
+        """Test that distribution includes last_used date."""
+        from datetime import date
+
+        database.add_categorization(
+            payee_name="COSTCO",
+            category_name="Groceries",
+            category_id="cat-001",
+            amount=-50.00,
+            transaction_id="txn-1",
+            transaction_date=date(2025, 1, 15),
+        )
+
+        dist = database.get_payee_category_distribution("COSTCO")
+
+        assert "last_used" in dist["Groceries"]
+        assert dist["Groceries"]["last_used"] == "2025-01-15"

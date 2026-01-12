@@ -401,6 +401,143 @@ class TestPullYnab:
         pending = temp_db.get_pending_change("txn-conflict")
         assert pending is None
 
+    def test_pull_backfills_categorization_history(
+        self, temp_db: Database, mock_ynab: MockYNABClient, mock_amazon: MockAmazonClient
+    ) -> None:
+        """Pull backfills categorization history from transactions on first run."""
+        # Create categorized transactions
+        mock_ynab.transactions = [
+            make_transaction(
+                "txn-1",
+                date=datetime(2025, 11, 1),
+                payee_name="COSTCO",
+                category_id="cat-groceries",
+                category_name="Groceries",
+            ),
+            make_transaction(
+                "txn-2",
+                date=datetime(2025, 11, 2),
+                payee_name="COSTCO",
+                category_id="cat-groceries",
+                category_name="Groceries",
+            ),
+            make_transaction(
+                "txn-3",
+                date=datetime(2025, 11, 3),
+                payee_name="AMAZON",
+                category_id="cat-1",
+                category_name="Electronics",
+            ),
+            make_transaction(
+                "txn-4",
+                date=datetime(2025, 11, 4),
+                payee_name="UNKNOWN",
+                category_id=None,  # Uncategorized - should NOT be in history
+                category_name=None,
+            ),
+        ]
+
+        service = SyncService(temp_db, mock_ynab, mock_amazon)
+
+        # Verify history is empty before pull
+        assert temp_db.get_payee_history("COSTCO") == []
+
+        # Pull triggers backfill
+        result = service.pull_ynab(full=True)
+        assert result.success is True
+
+        # Verify history was backfilled
+        costco_history = temp_db.get_payee_history("COSTCO")
+        assert len(costco_history) == 2
+
+        amazon_history = temp_db.get_payee_history("AMAZON")
+        assert len(amazon_history) == 1
+
+        # Uncategorized transaction should NOT be in history
+        unknown_history = temp_db.get_payee_history("UNKNOWN")
+        assert len(unknown_history) == 0
+
+        # Verify distribution
+        dist = temp_db.get_payee_category_distribution("COSTCO")
+        assert dist["Groceries"]["count"] == 2
+
+    def test_pull_adds_new_categorized_transactions_to_history(
+        self, temp_db: Database, mock_ynab: MockYNABClient, mock_amazon: MockAmazonClient
+    ) -> None:
+        """Subsequent pulls add new categorized transactions to history."""
+        now = datetime.now()
+
+        # First pull with one categorized transaction
+        mock_ynab.transactions = [
+            make_transaction(
+                "txn-1",
+                date=now - timedelta(days=1),
+                payee_name="COSTCO",
+                category_id="cat-groceries",
+                category_name="Groceries",
+            ),
+        ]
+
+        service = SyncService(temp_db, mock_ynab, mock_amazon)
+        service.pull_ynab(full=True)
+
+        # Verify initial state
+        assert len(temp_db.get_payee_history("COSTCO")) == 1
+
+        # Second pull with a new categorized transaction
+        mock_ynab.transactions = [
+            make_transaction(
+                "txn-1",
+                date=now - timedelta(days=1),
+                payee_name="COSTCO",
+                category_id="cat-groceries",
+                category_name="Groceries",
+            ),
+            make_transaction(
+                "txn-2",
+                date=now,
+                payee_name="COSTCO",
+                category_id="cat-2",
+                category_name="Home Improvement",
+            ),
+        ]
+
+        service.pull_ynab(full=False)
+
+        # Verify new transaction was added to history
+        history = temp_db.get_payee_history("COSTCO")
+        assert len(history) == 2
+
+        # Verify distribution shows both categories
+        dist = temp_db.get_payee_category_distribution("COSTCO")
+        assert "Groceries" in dist
+        assert "Home Improvement" in dist
+
+    def test_pull_does_not_duplicate_history_entries(
+        self, temp_db: Database, mock_ynab: MockYNABClient, mock_amazon: MockAmazonClient
+    ) -> None:
+        """Pulling same transaction multiple times doesn't create duplicate history."""
+        mock_ynab.transactions = [
+            make_transaction(
+                "txn-1",
+                date=datetime(2025, 11, 1),
+                payee_name="COSTCO",
+                category_id="cat-groceries",
+                category_name="Groceries",
+            ),
+        ]
+
+        service = SyncService(temp_db, mock_ynab, mock_amazon)
+
+        # Pull multiple times
+        service.pull_ynab(full=True)
+        service.pull_ynab(full=True)
+        service.pull_ynab(full=True)
+
+        # Should still only have one history entry
+        history = temp_db.get_payee_history("COSTCO")
+        assert len(history) == 1
+
 
 class TestPullAmazonIncremental:
     """Tests for incremental pull_amazon."""
