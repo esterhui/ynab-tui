@@ -5,6 +5,20 @@ All notable changes to YNAB TUI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-01-11
+
+### Added
+- **Historical category suggestions**: Category picker shows previously-used categories at top based on payee/item patterns with usage counts (e.g., "Groceries (12x)")
+- `pull -v/--verbose` flag shows detailed field-by-field diffs for updated transactions
+- Configurable logging via `[logging]` section in config.toml (`log_level`, `log_file`)
+- Revert detection: Changing a field back to its original value removes the pending change
+
+### Fixed
+- Push no longer clears existing category/memo when pushing approval-only changes
+- Combo matching no longer reuses transactions across multiple Amazon orders
+- Pending change updates now persist correctly (e.g., changing category from A to B after already changing from None to A)
+
+
 ## [0.2.0] - 2026-01-04
 
 ### Added
