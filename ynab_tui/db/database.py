@@ -1377,6 +1377,54 @@ class Database:
                 for row in rows
             }
 
+    def get_item_category_distributions_batch(
+        self, item_names: list[str]
+    ) -> dict[str, dict[str, dict[str, Any]]]:
+        """Get category distributions for multiple items in one query.
+
+        Args:
+            item_names: List of item names to look up.
+
+        Returns:
+            Dict mapping item_name -> {category_id: {name, count, percentage}, ...}
+        """
+        if not item_names:
+            return {}
+        normalized_map = {self.normalize_item(name): name for name in item_names}
+        normalized_names = list(normalized_map.keys())
+        with self._connection() as conn:
+            placeholders = ",".join("?" * len(normalized_names))
+            rows = conn.execute(
+                f"""SELECT item_name_normalized, category_id, category_name, COUNT(*) as count
+                FROM amazon_item_category_history
+                WHERE item_name_normalized IN ({placeholders})
+                GROUP BY item_name_normalized, category_id, category_name
+                ORDER BY item_name_normalized, count DESC""",
+                normalized_names,
+            ).fetchall()
+            if not rows:
+                return {}
+            # Calculate totals per item
+            item_totals: dict[str, int] = {}
+            for row in rows:
+                item_totals[row["item_name_normalized"]] = (
+                    item_totals.get(row["item_name_normalized"], 0) + row["count"]
+                )
+            # Build result dict
+            result: dict[str, dict[str, dict[str, Any]]] = {}
+            for row in rows:
+                item_norm = row["item_name_normalized"]
+                original_item = normalized_map.get(item_norm, item_norm)
+                if original_item not in result:
+                    result[original_item] = {}
+                total = item_totals[item_norm]
+                result[original_item][row["category_id"]] = {
+                    "name": row["category_name"],
+                    "count": row["count"],
+                    "percentage": row["count"] / total if total > 0 else 0,
+                }
+            return result
+
     def get_all_item_category_mappings(
         self, search_term: str | None = None, category_filter: str | None = None
     ) -> list[dict[str, Any]]:

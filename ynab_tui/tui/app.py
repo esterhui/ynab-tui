@@ -788,6 +788,12 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                 else:
                     current_category_display = txn.category_name
 
+            # Get category suggestions based on history
+            suggested = self._categorizer.get_category_suggestions(
+                payee_name=txn.payee_name,
+                amazon_items=txn.amazon_items if txn.is_amazon else None,
+            )
+
             summary = TransactionSummary(
                 date=txn.display_date,
                 payee=txn.payee_name,
@@ -795,6 +801,7 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
                 current_category=current_category_display,
                 current_category_id=txn.category_id if txn.category_id else None,
                 amazon_items=txn.amazon_items if txn.is_amazon else None,
+                suggested_categories=suggested if suggested else None,
             )
 
             categories = self._get_categories_for_picker()

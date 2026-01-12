@@ -5,7 +5,7 @@ from typing import Optional
 
 from textual.app import ComposeResult
 from textual.containers import Vertical
-from textual.widgets import Input, ListView, Static
+from textual.widgets import Input, ListItem, ListView, Static
 
 from .fuzzy_select import FuzzySelectModal
 
@@ -28,6 +28,7 @@ class TransactionSummary:
     current_category: Optional[str] = None
     current_category_id: Optional[str] = None
     amazon_items: Optional[list[str]] = None
+    suggested_categories: Optional[list[dict]] = None
 
 
 class CategoryPickerModal(FuzzySelectModal[CategorySelection]):
@@ -121,6 +122,21 @@ class CategoryPickerModal(FuzzySelectModal[CategorySelection]):
             return f"[bold cyan]{display}[/bold cyan] [yellow]<- Current[/yellow]"
         return display
 
+    def _format_suggestion(self, suggestion: dict) -> str:
+        """Format a suggested category for display."""
+        group = suggestion.get("group_name", "")
+        name = suggestion["category_name"]
+        count = suggestion["count"]
+
+        # Build count display
+        if suggestion.get("source") == "items" and suggestion.get("item_count", 0) > 1:
+            count_str = f"({count}x, {suggestion['item_count']} items)"
+        else:
+            count_str = f"({count}x)"
+
+        display = f"[dim]\\[{group}][/dim] {name}" if group else name
+        return f"[bold green]★ {display}[/bold green] [green]{count_str}[/green]"
+
     def _find_current_category_index(self) -> int:
         """Find the index of the current category in filtered items."""
         if not self._current_category_id:
@@ -131,20 +147,67 @@ class CategoryPickerModal(FuzzySelectModal[CategorySelection]):
         return 0
 
     def _populate_list(self) -> None:
-        """Populate list and scroll to current category."""
-        super()._populate_list()
+        """Populate list with suggestions at top, then all categories."""
+        from .fuzzy_select import FuzzySelectItem
 
-        # After populating, scroll to current category if no search query
+        self._populate_generation += 1
+        generation = self._populate_generation
+
+        list_view = self.query_one("#fuzzy-list", ListView)
+        list_view.clear()
+
         query = self.query_one("#fuzzy-input", Input).value.strip()
-        if not query and self._current_category_id:
-            list_view = self.query_one("#fuzzy-list", ListView)
-            initial_index = self._find_current_category_index()
-            if initial_index < len(self._filtered_items):
 
-                def set_to_current() -> None:
-                    list_view.index = initial_index
+        # Show suggestions only when no search query
+        suggestions = (
+            self._transaction.suggested_categories
+            if self._transaction and self._transaction.suggested_categories
+            else None
+        )
+        suggestion_count = 0
+        if not query and suggestions:
+            for suggestion in suggestions:
+                display_text = self._format_suggestion(suggestion)
+                # Create a category dict that maps to the suggestion
+                cat_dict = {
+                    "id": suggestion["category_id"],
+                    "name": suggestion["category_name"],
+                    "group_name": suggestion.get("group_name", ""),
+                }
+                list_view.append(FuzzySelectItem(display_text, cat_dict))
+                suggestion_count += 1
 
-                self.call_after_refresh(set_to_current)
+            # Add separator
+            list_view.append(ListItem(Static("[dim]─── All Categories ───[/dim]")))
+
+        # Handle empty filtered items
+        if not query and not self._show_all_on_empty:
+            list_view.append(ListItem(Static("[dim]Type to search...[/dim]")))
+            return
+
+        if not self._filtered_items:
+            list_view.append(ListItem(Static("No matches found")))
+            return
+
+        # Add regular categories (limit results for performance)
+        max_results = 100
+        for item in self._filtered_items[:max_results]:
+            display_text = self._display_fn(item)
+            list_view.append(FuzzySelectItem(display_text, item))
+
+        # Determine initial selection
+        def set_selection() -> None:
+            if generation != self._populate_generation:
+                return
+            if not query and self._current_category_id:
+                # Scroll to current category (after suggestions + separator)
+                offset = suggestion_count + (1 if suggestion_count > 0 else 0)
+                current_idx = self._find_current_category_index()
+                list_view.index = offset + current_idx
+            elif len(list_view) > 0:
+                list_view.index = 0
+
+        self.call_after_refresh(set_selection)
 
     @staticmethod
     def _search_text(cat: dict) -> str:

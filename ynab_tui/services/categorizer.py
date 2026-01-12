@@ -84,6 +84,79 @@ class CategorizerService:
             parts.append(f"{pct:.0f}% {cat}")
         return ", ".join(parts)
 
+    def get_category_suggestions(
+        self,
+        payee_name: str,
+        amazon_items: list[str] | None = None,
+        limit: int = 3,
+    ) -> list[dict]:
+        """Get category suggestions based on historical patterns.
+
+        For Amazon transactions, looks up categories used for matched items.
+        For non-Amazon transactions, looks up categories used for the same payee.
+
+        Args:
+            payee_name: The payee name for payee-based suggestions.
+            amazon_items: List of Amazon item names for item-based suggestions.
+            limit: Maximum number of suggestions to return.
+
+        Returns:
+            List of suggestion dicts with keys:
+            - category_id: str
+            - category_name: str
+            - group_name: str (from category lookup)
+            - count: int (total times used)
+            - source: str ("payee" or "items")
+            - item_count: int (for Amazon, how many items matched)
+        """
+        suggestions: list[dict] = []
+
+        if amazon_items:
+            # Amazon transaction: look up item history
+            item_distributions = self._db.get_item_category_distributions_batch(amazon_items)
+            if item_distributions:
+                # Aggregate across all items
+                aggregated: dict[str, dict] = {}
+                for item_name, dist in item_distributions.items():
+                    for cat_id, stats in dist.items():
+                        if cat_id not in aggregated:
+                            aggregated[cat_id] = {
+                                "category_id": cat_id,
+                                "category_name": stats["name"],
+                                "count": 0,
+                                "item_count": 0,
+                                "source": "items",
+                            }
+                        aggregated[cat_id]["count"] += stats["count"]
+                        aggregated[cat_id]["item_count"] += 1
+
+                # Sort by count and limit
+                sorted_cats = sorted(aggregated.values(), key=lambda x: x["count"], reverse=True)[
+                    :limit
+                ]
+                suggestions = sorted_cats
+        else:
+            # Non-Amazon: look up payee history
+            payee_dist = self._db.get_payee_category_distribution(payee_name)
+            if payee_dist:
+                for cat_name, stats in list(payee_dist.items())[:limit]:
+                    suggestions.append(
+                        {
+                            "category_id": stats["category_id"],
+                            "category_name": cat_name,
+                            "count": stats["count"],
+                            "source": "payee",
+                            "item_count": 0,
+                        }
+                    )
+
+        # Look up group names for each suggestion
+        for suggestion in suggestions:
+            cat = self.categories.find_by_id(suggestion["category_id"])
+            suggestion["group_name"] = cat.group_name if cat else ""
+
+        return suggestions
+
     def _get_original_values(
         self, transaction: "Transaction", fields: list[str] | None = None
     ) -> dict[str, str | bool | None]:
