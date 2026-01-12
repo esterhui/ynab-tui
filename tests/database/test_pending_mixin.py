@@ -57,7 +57,7 @@ class TestPendingChangesMixin:
             original_values={"category_id": None, "category_name": None},
         )
 
-        assert result is True
+        assert result == "created"
 
         # Verify it was created
         change = db_with_transaction.get_pending_change("txn-001")

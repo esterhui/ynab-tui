@@ -352,7 +352,9 @@ class Database:
             if existing:
                 # Check for pending changes - preserve local category if pending
                 pending = conn.execute(
-                    "SELECT new_category_id, new_category_name FROM pending_changes WHERE transaction_id=?",
+                    """SELECT json_extract(new_values, '$.category_id') as new_category_id,
+                              json_extract(new_values, '$.category_name') as new_category_name
+                       FROM pending_changes WHERE transaction_id=?""",
                     (txn.id,),
                 ).fetchone()
 
@@ -369,7 +371,7 @@ class Database:
 
                 # Use pending category values if they exist, otherwise use YNAB values
                 # BUT if conflict, preserve local category
-                if pending:
+                if pending and pending["new_category_id"]:
                     final_category_id = pending["new_category_id"]
                     final_category_name = pending["new_category_name"]
                 elif is_conflict:
@@ -569,7 +571,7 @@ class Database:
             conditions.append("t.approved = 0")
         if uncategorized_only:
             conditions.append(
-                "(COALESCE(pc.new_category_id, t.category_id) IS NULL OR COALESCE(pc.new_category_name, t.category_name) IS NULL) AND t.is_split = 0"
+                "(COALESCE(json_extract(pc.new_values, '$.category_id'), t.category_id) IS NULL OR COALESCE(json_extract(pc.new_values, '$.category_name'), t.category_name) IS NULL) AND t.is_split = 0"
             )
             conditions.extend(self._non_categorizable_conditions("t"))
         if pending_push_only:
@@ -578,17 +580,19 @@ class Database:
             conditions.append("t.payee_name LIKE ?")
             params.append(f"%{payee_filter}%")
         if category_id_filter:
-            conditions.append("COALESCE(pc.new_category_id, t.category_id) = ?")
+            conditions.append(
+                "COALESCE(json_extract(pc.new_values, '$.category_id'), t.category_id) = ?"
+            )
             params.append(category_id_filter)
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         limit_clause = f"LIMIT {limit}" if limit else ""
         with self._connection() as conn:
             rows = conn.execute(
                 f"""SELECT t.id, t.budget_id, t.date, t.amount, t.payee_name, t.payee_id,
-                COALESCE(pc.new_category_id, t.category_id) AS category_id,
-                COALESCE(pc.new_category_name, t.category_name) AS category_name,
+                COALESCE(json_extract(pc.new_values, '$.category_id'), t.category_id) AS category_id,
+                COALESCE(json_extract(pc.new_values, '$.category_name'), t.category_name) AS category_name,
                 t.account_name, t.account_id, t.memo, t.cleared,
-                COALESCE(pc.new_approved, t.approved) AS approved, t.is_split, t.parent_transaction_id,
+                COALESCE(json_extract(pc.new_values, '$.approved'), t.approved) AS approved, t.is_split, t.parent_transaction_id,
                 CASE WHEN pc.id IS NOT NULL THEN 'pending_push' ELSE t.sync_status END AS sync_status,
                 t.synced_at, t.modified_at, t.transfer_account_id, t.transfer_account_name, t.debt_transaction_type
                 FROM ynab_transactions t LEFT JOIN pending_changes pc ON t.id = pc.transaction_id
@@ -1067,8 +1071,17 @@ class Database:
         new_values: dict[str, Any],
         original_values: dict[str, Any],
         change_type: str = "update",
-    ) -> bool:
-        """Create or update a pending change for a transaction."""
+    ) -> str:
+        """Create or update a pending change for a transaction.
+
+        If after merging the new values equal the original values (i.e., the user
+        reverted all changes), the pending change is deleted instead of updated.
+
+        Returns:
+            "created" if a new pending change was created,
+            "updated" if an existing pending change was updated,
+            "deleted" if all changes were reverted (pending change removed).
+        """
         with self._connection() as conn:
             existing = conn.execute(
                 "SELECT new_values, original_values FROM pending_changes WHERE transaction_id = ?",
@@ -1083,16 +1096,33 @@ class Database:
                 merged_orig = {
                     k: v for k, v in {**original_values, **existing_orig}.items() if k in merged_new
                 }
+
+                # Check if all new values match original values (user reverted changes)
+                # Filter out fields where new == original
+                effective_changes = {k: v for k, v in merged_new.items() if merged_orig.get(k) != v}
+
+                if not effective_changes:
+                    # All changes reverted - delete the pending change
+                    conn.execute(
+                        "DELETE FROM pending_changes WHERE transaction_id = ?",
+                        (transaction_id,),
+                    )
+                    return "deleted"
+
+                # Keep only the fields that actually changed
+                effective_orig = {k: merged_orig[k] for k in effective_changes if k in merged_orig}
+
                 conn.execute(
                     "UPDATE pending_changes SET new_values=?, original_values=?, change_type=?, created_at=? WHERE transaction_id=?",
                     (
-                        json.dumps(merged_new),
-                        json.dumps(merged_orig),
+                        json.dumps(effective_changes),
+                        json.dumps(effective_orig),
                         change_type,
                         _now_iso(),
                         transaction_id,
                     ),
                 )
+                return "updated"
             else:
                 conn.execute(
                     """INSERT INTO pending_changes (transaction_id, budget_id, change_type, new_values, original_values,
@@ -1113,7 +1143,7 @@ class Database:
                         _now_iso(),
                     ),
                 )
-            return True
+                return "created"
 
     def get_pending_change(self, transaction_id: str) -> Optional[dict[str, Any]]:
         """Get pending change for a transaction if exists."""

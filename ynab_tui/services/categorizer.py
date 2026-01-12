@@ -413,7 +413,7 @@ class CategorizerService:
         )
 
         # Create pending change in delta table (preserves original for undo)
-        self._db.create_pending_change(
+        result = self._db.create_pending_change(
             transaction_id=transaction.id,
             new_values={
                 "category_id": category_id,
@@ -436,8 +436,14 @@ class CategorizerService:
         # Update the transaction object to reflect the change (for UI display)
         transaction.category_id = category_id
         transaction.category_name = category_name
-        transaction.sync_status = "pending_push"
         transaction.approved = True  # Auto-approve when categorizing
+
+        # Set sync_status based on whether changes are pending or reverted
+        if result == "deleted":
+            # All changes reverted - no longer pending
+            transaction.sync_status = "synced"
+        else:
+            transaction.sync_status = "pending_push"
 
         return transaction
 
@@ -605,7 +611,7 @@ class CategorizerService:
         originals = self._get_original_values(transaction, ["memo"])
 
         # Create pending change in delta table (preserves original for undo)
-        self._db.create_pending_change(
+        result = self._db.create_pending_change(
             transaction_id=transaction.id,
             new_values={"memo": memo},
             original_values=originals,
@@ -614,7 +620,13 @@ class CategorizerService:
 
         # Update the transaction object to reflect the change (for UI display)
         transaction.memo = memo
-        transaction.sync_status = "pending_push"
+
+        # Set sync_status based on whether changes are pending or reverted
+        if result == "deleted":
+            # All changes reverted - no longer pending
+            transaction.sync_status = "synced"
+        else:
+            transaction.sync_status = "pending_push"
 
         return transaction
 
