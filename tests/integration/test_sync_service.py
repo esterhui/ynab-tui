@@ -114,6 +114,20 @@ class MockYNABClient:
                 "approve": approve,
             }
         )
+        # Find original transaction to preserve its fields (like real YNAB API)
+        original = next((t for t in self.transactions if t.id == transaction_id), None)
+        if original:
+            return Transaction(
+                id=transaction_id,
+                date=original.date,
+                amount=original.amount,
+                payee_name=original.payee_name,
+                account_name=original.account_name,
+                category_name="Split",
+                category_id=None,  # YNAB assigns a budget-specific Split category ID
+                approved=approve,
+                is_split=True,
+            )
         return Transaction(
             id=transaction_id,
             date=datetime.now(),

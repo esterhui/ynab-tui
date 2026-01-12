@@ -401,7 +401,7 @@ class Database:
                         category_id=?, category_name=?, account_name=?, account_id=?, memo=?, cleared=?, approved=?,
                         is_split=?, parent_transaction_id=?, synced_at=?, transfer_account_id=?, transfer_account_name=?,
                         debt_transaction_type=?, budget_id=COALESCE(?, budget_id), sync_status=?
-                        WHERE id=? AND sync_status IN ('synced', 'conflict')""",
+                        WHERE id=? AND sync_status IN ('synced', 'conflict', 'pending_push')""",
                         (
                             new_date,
                             txn.amount,

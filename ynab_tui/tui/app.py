@@ -551,14 +551,16 @@ class YNABCategorizerApp(ListViewNavigationMixin, App):
             if remaining > 0:
                 txn_list.index = min(current_index or 0, remaining - 1)
         else:
-            # Other filters: update sync_status on affected rows
+            # Other filters: update sync_status and approved on affected rows
             for child in txn_list.children:
                 if isinstance(child, TransactionListItem) and child.txn.id in pushed_id_set:
                     child.txn.sync_status = "synced"
+                    child.txn.approved = True  # Pushed transactions are approved
                     # Also update cached list
                     for txn in self._transactions.transactions:
                         if txn.id == child.txn.id:
                             txn.sync_status = "synced"
+                            txn.approved = True
                             break
                     child.update_content()
 

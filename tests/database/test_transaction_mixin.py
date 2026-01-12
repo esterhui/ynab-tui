@@ -635,3 +635,38 @@ class TestConflictDetection:
         """fix_conflict_transaction returns False for non-existent transaction."""
         result = temp_db.fix_conflict_transaction("nonexistent-id")
         assert result is False
+
+    def test_upsert_updates_transaction_with_pending_push_status(self, temp_db: Database) -> None:
+        """upsert_ynab_transaction should update transactions with sync_status='pending_push'.
+
+        Bug: When pushing a split, the transaction has sync_status='pending_push' (set by
+        mark_pending_split), but upsert_ynab_transaction's WHERE clause only matches
+        'synced' or 'conflict', so the UPDATE fails silently and approved stays False.
+        """
+        # Setup: Insert transaction
+        txn = make_transaction(id="txn-split", approved=False)
+        temp_db.upsert_ynab_transaction(txn)
+
+        # Mark as pending split (this sets sync_status='pending_push')
+        temp_db.mark_pending_split(
+            "txn-split",
+            [{"category_id": "cat-1", "category_name": "Test", "amount": -50.0}],
+        )
+
+        # Verify it's now pending_push
+        stored = temp_db.get_ynab_transaction("txn-split")
+        assert stored["sync_status"] == "pending_push"
+        assert stored["approved"] == 0  # SQLite stores booleans as 0/1
+
+        # Simulate YNAB response after push (approved=True)
+        updated_txn = make_transaction(
+            id="txn-split", approved=True, category_name="Split", is_split=True
+        )
+        was_inserted, was_changed = temp_db.upsert_ynab_transaction(updated_txn)
+
+        # BUG: This should be True but is False because WHERE clause doesn't match 'pending_push'
+        assert was_changed is True, "upsert should have updated the transaction"
+
+        # Verify approved was updated
+        stored = temp_db.get_ynab_transaction("txn-split")
+        assert stored["approved"] == 1, "approved should be True after push"
