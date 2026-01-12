@@ -213,11 +213,13 @@ class FuzzySelectModal(ModalScreen[Optional[T]], Generic[T]):
 
         # Handle Enter - select current item
         if event.key == "enter":
-            if list_view.index is not None and len(self._filtered_items) > 0:
-                idx = list_view.index
-                if 0 <= idx < len(self._filtered_items):
-                    item = self._filtered_items[idx]
-                    result = self._result_fn(item)
+            if list_view.index is not None:
+                # Get the actual selected widget to retrieve its data
+                # This handles cases where the ListView contains extra items
+                # (like suggestions or separators) not in _filtered_items
+                selected_item = list_view.highlighted_child
+                if isinstance(selected_item, FuzzySelectItem):
+                    result = self._result_fn(selected_item.item)
                     self.dismiss(result)
                     event.stop()
                     event.prevent_default()

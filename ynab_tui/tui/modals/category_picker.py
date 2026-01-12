@@ -134,8 +134,9 @@ class CategoryPickerModal(FuzzySelectModal[CategorySelection]):
         else:
             count_str = f"({count}x)"
 
-        display = f"[dim]\\[{group}][/dim] {name}" if group else name
-        return f"[bold green]★ {display}[/bold green] [green]{count_str}[/green]"
+        if group:
+            return f"[green]★[/green] [dim]\\[{group}][/dim] {name} [green]{count_str}[/green]"
+        return f"[green]★[/green] {name} [green]{count_str}[/green]"
 
     def _find_current_category_index(self) -> int:
         """Find the index of the current category in filtered items."""
