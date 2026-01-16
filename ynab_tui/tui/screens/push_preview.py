@@ -12,27 +12,29 @@ from textual.worker import Worker, WorkerState
 
 from ...services.sync import SyncService
 from ..constants import VIM_NAVIGATION_BINDINGS
-from ..layout import ColumnWidths
+from ..layout import ColumnWidths, calculate_column_widths
 from ..mixins import ListViewNavigationMixin
 
 if TYPE_CHECKING:
     from ...services import CategorizerService
 
-# Column widths for push preview (uses shared base values)
-_WIDTHS = ColumnWidths(payee=28, category=20, account=0)
+# Default widths for push preview (without account column)
+_DEFAULT_WIDTHS = ColumnWidths(payee=28, category=20, account=0)
 
 
 class PushChangeItem(ListItem):
     """A list item displaying a pending change row."""
 
-    def __init__(self, change: dict) -> None:
+    def __init__(self, change: dict, widths: ColumnWidths | None = None) -> None:
         """Initialize with a pending change dict.
 
         Args:
             change: Dict from get_all_pending_changes() with transaction details.
+            widths: Optional column widths (uses defaults if not provided).
         """
         super().__init__()
         self.change = change
+        self._widths = widths or _DEFAULT_WIDTHS
 
     def compose(self) -> ComposeResult:
         """Compose the list item content."""
@@ -41,7 +43,7 @@ class PushChangeItem(ListItem):
     def _format_row(self) -> str:
         """Format the pending change as a row string."""
         change = self.change
-        w = _WIDTHS
+        w = self._widths
 
         # Format date (fixed width)
         date_str = str(change.get("date", ""))[: w.date].ljust(w.date)
@@ -64,9 +66,22 @@ class PushChangeItem(ListItem):
         cat_width = w.category
         half_cat = cat_width // 2 - 2  # For "old -> new" format
 
+        # Check if this is a transfer (has transfer_account_id)
+        is_transfer = bool(change.get("transfer_account_id"))
+
         if change_type == "split":
             # For splits, show simple indicator
             change_desc = "[cyan]-> Split[/cyan]"
+        elif is_transfer:
+            # Transfers: show destination account (FROM is already in payee)
+            amount = change.get("amount", 0)
+            if amount >= 0:
+                # Incoming: destination is this account
+                to_acct = change.get("account_name") or "Transfer"
+            else:
+                # Outgoing: destination is the other account
+                to_acct = change.get("transfer_account_name") or "Transfer"
+            change_desc = f"[cyan]-> {to_acct[:cat_width]}[/cyan]"
         elif has_category_change:
             # Category change - show old -> new
             old_cat = (
@@ -194,6 +209,21 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
         self._categorizer = categorizer
         self._changes = changes
         self._pushing = False
+        self._column_widths = _DEFAULT_WIDTHS
+
+    def on_mount(self) -> None:
+        """Calculate column widths when screen mounts."""
+        self._column_widths = self._calculate_widths()
+
+    def _calculate_widths(self) -> ColumnWidths:
+        """Calculate column widths for push preview (no account column)."""
+        base_widths = calculate_column_widths(self.size.width)
+        # Push preview doesn't show account column, so give that space to category
+        return ColumnWidths(
+            payee=base_widths.payee,
+            category=base_widths.category + base_widths.account,
+            account=0,
+        )
 
     def compose(self) -> ComposeResult:
         """Compose the screen."""
@@ -204,7 +234,7 @@ class PushPreviewScreen(ListViewNavigationMixin, Screen):
                 id="header-label",
             ),
             ListView(
-                *[PushChangeItem(change) for change in self._changes],
+                *[PushChangeItem(change, self._column_widths) for change in self._changes],
                 id="changes-list",
             ),
             Static("", id="status-bar"),

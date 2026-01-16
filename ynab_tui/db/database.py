@@ -1183,7 +1183,7 @@ class Database:
                 f"""SELECT pc.id, pc.transaction_id, pc.change_type, pc.new_values, pc.original_values,
                 pc.new_category_id, pc.new_category_name, pc.original_category_id, pc.original_category_name,
                 pc.new_approved, pc.original_approved, pc.created_at, t.date, t.amount, t.payee_name, t.account_name,
-                t.approved, t.memo, t.category_name, t.category_id
+                t.approved, t.memo, t.category_name, t.category_id, t.transfer_account_id, t.transfer_account_name
                 FROM pending_changes pc JOIN ynab_transactions t ON pc.transaction_id = t.id {where_clause} ORDER BY t.date DESC""",
                 params,
             ).fetchall()
